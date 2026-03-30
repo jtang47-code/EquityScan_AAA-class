@@ -1,0 +1,1556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EquityScan Dashboard</title>
+    
+    <!-- Dependencies -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.4.3/echarts.min.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap');
+
+        :root {
+            /* Architect Terminal Color Palette */
+            --app-bg: #0a0d14;
+            --sidebar-bg: #11141c;
+            --panel-bg: #14171f;
+            --panel-border: #262a36;
+            --text-main: #f3f4f6;
+            --text-muted: #8b949e;
+            --accent-blue: #3b82f6;
+            --accent-blue-hover: #2563eb;
+            --accent-green: #22c55e;
+            --accent-orange: #f59e0b;
+            --accent-red: #ef4444;
+            --radius: 2px;
+        }
+        
+        * { box-sizing: border-box; }
+        
+        body { 
+            margin: 0;
+            font-family: 'Montserrat', sans-serif; 
+            background-color: var(--app-bg); 
+            color: var(--text-main); 
+            overflow: hidden;
+        }
+
+        /* Scrollbars */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+
+        /* Typography & Layout */
+        .panel {
+            background: var(--panel-bg);
+            border: 1px solid var(--panel-border);
+            border-radius: var(--radius);
+            padding: 20px;
+        }
+
+        .panel-title {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 16px;
+        }
+
+        /* Sidebar Navigation */
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 20px;
+            color: var(--text-muted);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border-left: 3px solid transparent;
+        }
+        
+        .nav-item:hover {
+            color: var(--text-main);
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        .nav-item.active {
+            color: var(--text-main);
+            background: rgba(255, 255, 255, 0.05);
+            border-left-color: var(--accent-blue);
+        }
+
+        .app-shell {
+            --sidebar-collapsed-width: 84px;
+            --right-pane-width: calc(100vw - var(--sidebar-collapsed-width));
+            --sidebar-width: 220px;
+            --main-pad: 14px;
+            --canvas-max: 1600px;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        .app-shell.collapsed {
+            --sidebar-width: 84px;
+            --main-pad: 14px;
+            --canvas-max: 1600px;
+        }
+
+        .top-frame {
+            display: grid;
+            grid-template-columns: var(--sidebar-width) var(--right-pane-width);
+            height: 60px;
+            flex-shrink: 0;
+            background: var(--sidebar-bg);
+            transition: grid-template-columns 0.3s ease;
+        }
+
+        .brand-bar {
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            background: var(--sidebar-bg);
+            border-bottom: 1px solid var(--panel-border);
+            overflow: hidden;
+            transition: padding 0.3s ease;
+        }
+
+        .brand-title {
+            display: inline-flex;
+            align-items: center;
+            white-space: nowrap;
+            overflow: hidden;
+        }
+
+        .app-shell.collapsed .brand-bar {
+            padding: 0 20px;
+            justify-content: flex-start;
+        }
+
+        .logo-seg {
+            display: inline-block;
+            white-space: nowrap;
+        }
+
+        .logo-e,
+        .logo-quity {
+            font-weight: 700;
+            color: #ffffff;
+        }
+
+        .logo-s,
+        .logo-can {
+            font-weight: 400;
+            color: #9ca3af;
+        }
+
+        .logo-quity,
+        .logo-can {
+            overflow: hidden;
+            transition: max-width 0.34s cubic-bezier(0.2, 0.7, 0.2, 1), opacity 0.24s ease;
+            max-width: 9ch;
+            opacity: 1;
+            will-change: max-width, opacity;
+        }
+
+        .logo-s {
+            transition: color 0.2s ease;
+        }
+
+        .app-shell.collapsed .logo-quity {
+            max-width: 0;
+            opacity: 0;
+        }
+
+        .app-shell.collapsed .logo-can {
+            max-width: 0;
+            opacity: 0;
+        }
+
+        .content-frame {
+            display: flex;
+            flex: 1;
+            min-height: 0;
+            overflow: hidden;
+        }
+
+        .sidebar {
+            width: var(--sidebar-width);
+            transition: width 0.3s ease;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+            background: var(--sidebar-bg);
+            border-right: 1px solid var(--panel-border);
+        }
+
+        .main-pane {
+            width: var(--right-pane-width);
+            flex: 0 0 var(--right-pane-width);
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            background: var(--app-bg);
+            transition: width 0.3s ease, flex-basis 0.3s ease;
+        }
+
+        .sidebar-copy {
+            transition: max-width 0.32s ease, opacity 0.24s ease;
+            white-space: nowrap;
+            max-width: 220px;
+            overflow: hidden;
+        }
+
+        .sidebar.collapsed .sidebar-copy {
+            max-width: 0;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .sector-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: flex-start;
+            gap: 12px;
+            transition: gap 0.3s ease;
+        }
+
+        .sector-copy {
+            min-width: 0;
+            transition: max-width 0.3s ease, opacity 0.24s ease, transform 0.3s ease;
+            max-width: 180px;
+        }
+
+        .sidebar.collapsed .sector-copy {
+            max-width: 0;
+            opacity: 0;
+            overflow: hidden;
+        }
+
+        .sidebar.collapsed .sector-header {
+            gap: 0;
+        }
+
+        .sidebar-toggle {
+            border: 1px solid var(--panel-border);
+            background: rgba(255, 255, 255, 0.02);
+            color: var(--text-muted);
+            width: 28px;
+            height: 28px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: var(--radius);
+            cursor: pointer;
+            transition: transform 0.3s ease, color 0.2s ease, border-color 0.2s ease;
+            flex-shrink: 0;
+        }
+
+        .sidebar-toggle:hover {
+            color: var(--text-main);
+            border-color: #374151;
+        }
+
+        .sidebar.collapsed .sidebar-toggle {
+            margin-left: 0;
+        }
+
+        .sidebar-toggle i {
+            transition: transform 0.3s ease;
+        }
+
+        .sidebar.collapsed .sidebar-toggle i {
+            transform: rotate(180deg);
+        }
+
+        .nav-label {
+            display: inline-block;
+            max-width: 180px;
+            overflow: hidden;
+            transition: max-width 0.32s ease, opacity 0.24s ease;
+            white-space: nowrap;
+        }
+
+        .sidebar.collapsed .nav-item {
+            justify-content: flex-start;
+            padding-left: 20px;
+            padding-right: 20px;
+            gap: 12px;
+        }
+
+        .sidebar.collapsed .nav-label {
+            max-width: 0;
+            opacity: 0;
+        }
+
+        /* Top Ribbon */
+        .top-ribbon {
+            background: var(--sidebar-bg);
+            border-bottom: 1px solid var(--panel-border);
+            position: static;
+            z-index: 10;
+            padding: 0 var(--main-pad);
+            min-width: 0;
+        }
+
+        .ribbon-link {
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: color 0.2s ease;
+            display: flex;
+            align-items: center;
+            height: 100%;
+            white-space: nowrap;
+        }
+
+        .ribbon-link:hover,
+        .ribbon-link.active {
+            color: var(--text-main);
+        }
+
+        .industry-menu {
+            position: relative;
+            display: flex;
+            align-items: center;
+            height: 100%;
+        }
+
+        .industry-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            min-width: 180px;
+            background: var(--panel-bg);
+            border: 1px solid var(--panel-border);
+            border-top: 0;
+            border-radius: 0 0 4px 4px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+            padding: 8px;
+            opacity: 0;
+            transform: translateY(0);
+            pointer-events: none;
+            transition: opacity 0.2s ease;
+            z-index: 40;
+        }
+
+        .industry-menu:hover .industry-dropdown {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .industry-option {
+            display: block;
+            width: 100%;
+            border: 0;
+            background: transparent;
+            appearance: none;
+            outline: none;
+            color: var(--text-muted);
+            text-align: left;
+            font-size: 12px;
+            font-weight: 600;
+            padding: 8px 10px;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: color 0.2s ease, background-color 0.2s ease;
+        }
+
+        .industry-option:hover {
+            color: var(--text-main);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .industry-option:focus,
+        .industry-option:focus-visible {
+            outline: none;
+            color: var(--text-muted);
+            background: transparent;
+        }
+
+        .search-input {
+            background: var(--panel-bg);
+            border: 1px solid var(--panel-border);
+            color: var(--text-main);
+            border-radius: var(--radius);
+            padding: 8px 16px 8px 36px;
+            font-size: 13px;
+            width: 300px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .search-input:focus { border-color: var(--accent-blue); }
+
+        /* Chart Time Selector */
+        .time-selector {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+        }
+        .time-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            font-size: 11px;
+            font-weight: 600;
+            padding: 4px 10px;
+            border-radius: var(--radius);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .time-btn:hover { color: var(--text-main); }
+        .time-btn.active {
+            background: rgba(59, 130, 246, 0.15);
+            color: #60a5fa;
+        }
+
+        .dropdown {
+            position: relative;
+        }
+
+        .dropdown-toggle {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--panel-border);
+            color: var(--text-muted);
+            font-size: 11px;
+            font-weight: 600;
+            padding: 4px 10px;
+            border-radius: var(--radius);
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: color 0.2s ease, border-color 0.2s ease;
+        }
+
+        .dropdown-toggle:hover {
+            color: var(--text-main);
+            border-color: #374151;
+        }
+
+        .dropdown-menu {
+            position: absolute;
+            top: calc(100% + 8px);
+            right: 0;
+            min-width: 136px;
+            background: var(--panel-bg);
+            border: 1px solid var(--panel-border);
+            border-radius: 4px;
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+            padding: 8px;
+            display: none;
+            z-index: 40;
+        }
+
+        .dropdown.open .dropdown-menu {
+            display: block;
+        }
+
+        .dropdown-option {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 4px;
+            color: var(--text-main);
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .dropdown-option input {
+            accent-color: var(--accent-blue);
+        }
+
+        .mini-legend {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            flex-wrap: wrap;
+        }
+
+        .legend-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+        }
+
+        .legend-swatch {
+            width: 10px;
+            height: 2px;
+            border-radius: 999px;
+        }
+
+        /* Summary Cards (Valuation Outlook) */
+        .summary-card {
+            border: 1px solid var(--panel-border);
+            border-radius: var(--radius);
+            padding: 24px;
+            background: rgba(255, 255, 255, 0.01);
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            transition: all 0.3s;
+        }
+        .summary-card:hover {
+            border-color: #374151;
+            background: rgba(255, 255, 255, 0.02);
+        }
+        .summary-card .k {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+            font-weight: 700;
+        }
+        .summary-card .v {
+            font-size: 36px;
+            font-weight: 300;
+            color: var(--text-main);
+            line-height: 1.1;
+        }
+        .summary-card .note {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 12px;
+            font-style: italic;
+        }
+
+        /* Tables */
+        .custom-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 12px; }
+        .custom-table th { 
+            padding: 10px 12px; text-align: right; 
+            color: var(--text-muted); font-weight: 600; font-size: 10px; text-transform: uppercase; letter-spacing: 1px;
+            border-bottom: 1px solid var(--panel-border);
+        }
+        .custom-table th:first-child { text-align: left; }
+        .custom-table td { 
+            padding: 10px 12px; text-align: right; border-bottom: 1px solid rgba(255, 255, 255, 0.05); color: var(--text-main); 
+        }
+        .custom-table td:first-child { text-align: left; font-weight: 500; color: var(--text-muted); }
+        .custom-table tr:hover td { background: rgba(255, 255, 255, 0.02); }
+        .row-header td { font-weight: 600; color: var(--text-main) !important; background: rgba(255,255,255,0.02); }
+        .row-major td { font-weight: 600; color: var(--text-main) !important; background: rgba(255,255,255,0.015); }
+        .row-sub td { font-size: 11px; padding-top: 6px; padding-bottom: 10px; font-style: italic; border-top: 1px dashed var(--panel-border); }
+        
+        .text-up { color: var(--accent-green) !important; }
+        .text-down { color: var(--accent-red) !important; }
+
+        .industry-section-title {
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            margin-bottom: 8px;
+        }
+
+        .industry-detail-box {
+            border: 1px solid var(--panel-border);
+            border-radius: var(--radius);
+            background: rgba(255, 255, 255, 0.01);
+            padding: 14px;
+        }
+
+        .industry-detail-text {
+            font-size: 12px;
+            color: var(--text-main);
+            line-height: 1.55;
+        }
+
+        .industry-mini-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+        }
+
+        .industry-mini-table th,
+        .industry-mini-table td {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            padding: 8px 10px;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        .industry-mini-table th {
+            color: var(--text-muted);
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .industry-node-key {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 8px 12px;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px dashed rgba(255, 255, 255, 0.1);
+        }
+
+        .industry-node-key-item {
+            font-size: 11px;
+            color: var(--text-muted);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* Loading Overlay */
+        .loader-overlay {
+            background: rgba(10, 13, 20, 0.9);
+            backdrop-filter: blur(4px);
+        }
+
+        .dashboard-view {
+            padding: var(--main-pad);
+            transition: padding 0.3s ease;
+        }
+
+        .dashboard-canvas {
+            width: min(100%, var(--canvas-max));
+            margin: 0 auto;
+            padding-bottom: 48px;
+            transition: width 0.3s ease;
+        }
+
+        .industry-canvas {
+            width: 100%;
+            margin: 0;
+            padding-bottom: 48px;
+        }
+
+        .industry-flow-legend {
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            color: #94a3b8;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+
+        .industry-flow-legend-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .industry-flow-swatch {
+            width: 12px;
+            height: 3px;
+            border-radius: 999px;
+            display: inline-block;
+        }
+
+        .industry-flow-swatch.inflow {
+            background: rgba(126, 148, 185, 0.84);
+        }
+
+        .industry-flow-swatch.outflow {
+            background: rgba(116, 164, 170, 0.84);
+        }
+
+        .app-shell.home-mode {
+            --sidebar-width: 220px;
+            --right-pane-width: calc(100vw - 220px);
+        }
+
+        .app-shell.home-mode .top-frame {
+            grid-template-columns: 220px calc(100vw - 220px);
+        }
+
+        .app-shell.home-mode .brand-bar {
+            opacity: 1;
+            pointer-events: auto;
+            padding: 0 20px;
+            justify-content: flex-start;
+        }
+
+        .app-shell.home-mode .logo-quity,
+        .app-shell.home-mode .logo-can {
+            max-width: 9ch;
+            opacity: 1;
+        }
+
+        .app-shell.home-mode .sidebar {
+            width: 0;
+            border-right: 0;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .app-shell.home-mode .main-pane {
+            width: 100vw;
+            flex-basis: 100vw;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="app-shell" id="appShell">
+    <div class="top-frame">
+        <div class="brand-bar">
+            <h1 class="brand-title text-[15px] font-bold tracking-widest text-white">
+                <span class="logo-seg logo-e">E</span>
+                <span class="logo-seg logo-quity">QUITY</span>
+                <span class="logo-seg logo-s">S</span>
+                <span class="logo-seg logo-can">CAN</span>
+            </h1>
+        </div>
+        
+        <!-- Top Ribbon -->
+        <header class="top-ribbon h-[60px] flex items-center justify-between shrink-0">
+            <div class="flex items-center gap-6 h-full">
+                <div class="flex gap-6 text-sm font-medium h-full">
+                    <span id="ribbonHome" class="ribbon-link active" onclick="openHomeFromRibbon()">Home</span>
+                    <div class="industry-menu">
+                        <span id="ribbonIndustries" class="ribbon-link">Industries</span>
+                        <div id="industryDropdown" class="industry-dropdown"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-6">
+                <div class="relative">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs"></i>
+                    <input type="text" id="tickerInput" class="search-input" placeholder="Search ticker or company..." onkeypress="handleEnter(event)">
+                </div>
+            </div>
+        </header>
+    </div>
+
+    <div class="content-frame" id="contentFrame">
+    <!-- Sidebar -->
+    <aside class="sidebar z-20" id="sidebar">
+            <!-- Sector Context -->
+            <div class="px-5 py-6 border-b border-[var(--panel-border)]">
+                <div class="sector-header">
+                    <div class="sector-copy">
+                        <div id="sidebarSectorTitle" class="sidebar-copy text-[11px] font-bold text-white tracking-wider">INDUSTRY</div>
+                        <div id="sidebarSectorSubtitle" class="sidebar-copy text-[10px] text-gray-500">Select from Industries menu</div>
+                    </div>
+                    <button id="sidebarToggle" onclick="toggleSidebar()" class="sidebar-toggle" aria-label="Toggle sidebar">
+                        <i class="fa-solid fa-angles-left"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Navigation Links -->
+            <nav class="flex-1 py-4 flex flex-col gap-1">
+                <div class="nav-item" onclick="switchTab('industry', this)">
+                    <i class="fa-solid fa-diagram-project w-5 text-center"></i><span class="nav-label">INDUSTRY CHAIN</span>
+                </div>
+                <div class="nav-item" onclick="switchTab('dashboard', this)">
+                    <i class="fa-solid fa-chart-simple w-5 text-center"></i><span class="nav-label">DASHBOARD</span>
+                </div>
+                <div class="nav-item" onclick="switchTab('glossary', this)">
+                    <i class="fa-solid fa-book-bookmark w-5 text-center"></i><span class="nav-label">GLOSSARY</span>
+                </div>
+            </nav>
+    </aside>
+
+    <!-- Main Content Area -->
+    <div class="main-pane">
+        <!-- Loading Overlay -->
+        <div id="loading" class="hidden absolute inset-0 z-50 flex items-center justify-center loader-overlay">
+            <div class="flex flex-col items-center">
+                <i class="fa-solid fa-circle-notch fa-spin text-3xl text-blue-500 mb-4"></i>
+                <p class="text-gray-400 text-xs font-bold uppercase tracking-widest">Querying Architect Database</p>
+            </div>
+        </div>
+
+        <!-- Home View -->
+        <main class="home-view flex-1 overflow-y-auto" id="homeView">
+            <div id="homeViewContent"></div>
+        </main>
+
+        <!-- Dashboard View -->
+        <main class="dashboard-view flex-1 overflow-y-auto hidden" id="dashboardView">
+            <div class="dashboard-canvas">
+                
+                <!-- Dashboard Header -->
+                <div class="flex justify-between items-end mb-8">
+                    <div class="flex items-center gap-4">
+                        <div class="flex flex-col justify-end">
+                            <div class="flex items-center gap-3 mb-1">
+                                <span class="border border-[var(--panel-border)] text-[9px] font-bold px-2 py-0.5 rounded-sm uppercase tracking-widest text-gray-400">Real-Time Matrix</span>
+                            </div>
+                            <div class="flex items-baseline gap-3">
+                                <h1 id="stockName" class="text-3xl font-extrabold tracking-tight text-white m-0 leading-none uppercase">COMPANY NAME</h1>
+                                <h2 id="stockTicker" class="text-xl font-bold text-gray-400 m-0 leading-none">(TICKER)</h2>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="text-right">
+                        <div class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Current Price</div>
+                        <div class="flex items-baseline gap-4 justify-end">
+                            <div class="text-4xl font-bold text-white leading-none"><span id="val-price">-</span><span class="text-sm font-medium text-gray-500 ml-2">USD</span></div>
+                            <div class="text-lg font-semibold leading-none flex items-center gap-1" id="val-change">
+                                - (-)
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 1. Forward Valuation Outlook (Full Width) -->
+                <div class="panel mb-6 p-0 flex flex-col">
+                    <div class="p-4 border-b border-[var(--panel-border)] flex justify-between items-center bg-[rgba(255,255,255,0.01)]">
+                        <h3 class="text-[11px] font-bold text-gray-400 uppercase tracking-[1.5px] m-0">Forward Valuation Outlook</h3>
+                        <span class="text-[9px] font-bold text-gray-500 uppercase tracking-widest border border-[var(--panel-border)] px-2 py-1 rounded-sm bg-[var(--app-bg)]">Metrics</span>
+                    </div>
+                    <div class="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div class="summary-card">
+                            <div class="k">Forward EPS</div>
+                            <div class="v" id="val-eps">-</div>
+                            <div class="note" id="note-eps">Weighted NTM</div>
+                        </div>
+                        <div class="summary-card">
+                            <div class="k">Forward P/E</div>
+                            <div class="v" id="val-pe">-</div>
+                            <div class="note">Price / Fwd EPS</div>
+                        </div>
+                        <div class="summary-card">
+                            <div class="k">5-Year PEG</div>
+                            <div class="v" id="val-peg-5y">-</div>
+                            <div class="note" id="note-growth-5y">5Y Avg Growth: -</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Market Performance -->
+                <div class="panel mb-6 flex flex-col p-0">
+                    <div class="p-4 border-b border-[var(--panel-border)] bg-[rgba(255,255,255,0.01)]">
+                        <h3 class="text-[11px] font-bold text-gray-400 uppercase tracking-[1.5px] m-0">Market Performance</h3>
+                    </div>
+                    <div class="p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+                        <!-- Chart Left -->
+                        <div class="lg:col-span-9 flex flex-col border border-[var(--panel-border)] rounded-sm overflow-hidden bg-[rgba(255,255,255,0.01)]">
+                            <div class="flex justify-between items-center p-3 border-b border-[var(--panel-border)]">
+                                <div class="text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-2">Price History</div>
+                                <div class="time-selector" id="timeFilters">
+                                    <div class="dropdown" id="maDropdown">
+                                        <button class="dropdown-toggle" id="maToggle" type="button" onclick="toggleMADropdown(event)">
+                                            <span>MAs</span>
+                                            <i class="fa-solid fa-chevron-down text-[9px]"></i>
+                                        </button>
+                                        <div class="dropdown-menu">
+                                            <label class="dropdown-option"><input type="checkbox" value="20" onchange="handleMAToggle(event)"> MA20</label>
+                                            <label class="dropdown-option"><input type="checkbox" value="50" onchange="handleMAToggle(event)"> MA50</label>
+                                            <label class="dropdown-option"><input type="checkbox" value="200" onchange="handleMAToggle(event)"> MA200</label>
+                                        </div>
+                                    </div>
+                                    <button class="time-btn active" data-range="1M">1M</button>
+                                    <button class="time-btn" data-range="3M">3M</button>
+                                    <button class="time-btn" data-range="6M">6M</button>
+                                    <button class="time-btn" data-range="YTD">YTD</button>
+                                    <button class="time-btn" data-range="1Y">1Y</button>
+                                    <button class="time-btn" data-range="MAX">MAX</button>
+                                </div>
+                            </div>
+                            <div class="flex-1 p-2 relative min-h-[320px]">
+                                <div id="priceChart" class="absolute inset-0"></div>
+                            </div>
+                        </div>
+                        <!-- Returns Right -->
+                        <div class="lg:col-span-3 flex flex-col border border-[var(--panel-border)] rounded-sm overflow-hidden bg-[rgba(255,255,255,0.01)]">
+                            <div class="p-3 border-b border-[var(--panel-border)] text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-4">
+                                Relative Return vs Nasdaq (IXIC)
+                            </div>
+                            <div id="comparisonTableContainer" class="flex-1 p-4 flex flex-col justify-center"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. Income, Margins & Capex -->
+                <div class="panel mb-6 flex flex-col p-0">
+                    <div class="p-4 border-b border-[var(--panel-border)] bg-[rgba(255,255,255,0.01)]">
+                        <h3 class="text-[11px] font-bold text-gray-400 uppercase tracking-[1.5px] m-0">Income, Margins & Capex</h3>
+                    </div>
+                    
+                    <div class="p-6">
+                        <!-- Part A: Annual Financials -->
+                        <div class="grid grid-cols-1 xl:grid-cols-12 gap-6 mb-8 items-stretch">
+                            <div class="xl:col-span-7 flex flex-col">
+                                <div class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Annual Financials & Expenditures (M$)</div>
+                                <div class="table-container flex-1 border border-[var(--panel-border)] rounded-sm overflow-hidden bg-[var(--app-bg)]">
+                                    <div id="incomeTableContainer"></div>
+                                </div>
+                            </div>
+                            <div class="xl:col-span-5 flex flex-col gap-4 mt-7">
+                                <div class="border border-[var(--panel-border)] rounded-sm flex flex-col flex-1 min-h-[140px] bg-[rgba(255,255,255,0.01)]">
+                                    <div class="p-2 px-3 border-b border-[var(--panel-border)] flex justify-between items-center text-[9px] font-bold text-gray-400 uppercase tracking-widest">
+                                        <span>Revenue</span><span>YoY Growth (RHS)</span>
+                                    </div>
+                                    <div class="flex-1 p-2 relative"><div id="revGrowthChart" class="absolute inset-0"></div></div>
+                                </div>
+                                <div class="border border-[var(--panel-border)] rounded-sm flex flex-col flex-1 min-h-[140px] bg-[rgba(255,255,255,0.01)]">
+                                    <div class="p-2 px-3 border-b border-[var(--panel-border)] flex justify-between items-center text-[9px] font-bold text-gray-400 uppercase tracking-widest">
+                                        <span>Net Income</span><span>YoY Growth (RHS)</span>
+                                    </div>
+                                    <div class="flex-1 p-2 relative"><div id="niGrowthChart" class="absolute inset-0"></div></div>
+                                </div>
+                                <div class="border border-[var(--panel-border)] rounded-sm flex flex-col flex-1 min-h-[140px] bg-[rgba(255,255,255,0.01)]">
+                                    <div class="p-2 px-3 border-b border-[var(--panel-border)] flex justify-between items-center text-[9px] font-bold text-gray-400 uppercase tracking-widest">
+                                        <span>CAPEX</span><span>YoY Growth (RHS)</span>
+                                    </div>
+                                    <div class="flex-1 p-2 relative"><div id="capexChart" class="absolute inset-0"></div></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Part B: Profitability Efficiency -->
+                        <div class="grid grid-cols-1 xl:grid-cols-12 gap-6 items-stretch pt-6 border-t border-[var(--panel-border)]">
+                            <div class="xl:col-span-7 flex flex-col">
+                                <div class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Profitability Efficiency</div>
+                                <div class="table-container flex-1 border border-[var(--panel-border)] rounded-sm overflow-hidden bg-[var(--app-bg)]">
+                                    <div id="marginTableContainer"></div>
+                                </div>
+                            </div>
+                            <div class="xl:col-span-5 flex flex-col mt-7">
+                                <div class="border border-[var(--panel-border)] rounded-sm flex flex-col flex-1 min-h-[220px] bg-[rgba(255,255,255,0.01)]">
+                                    <div class="p-2 px-3 border-b border-[var(--panel-border)] flex justify-between items-center text-[9px] font-bold text-gray-400 uppercase tracking-widest">
+                                        <span>Margin Trends</span>
+                                        <div class="mini-legend">
+                                            <span class="legend-item"><span class="legend-swatch" style="background: var(--accent-green);"></span>Gross</span>
+                                            <span class="legend-item"><span class="legend-swatch" style="background: var(--accent-orange);"></span>Operating</span>
+                                            <span class="legend-item"><span class="legend-swatch" style="background: var(--accent-blue);"></span>Net</span>
+                                        </div>
+                                    </div>
+                                    <div class="flex-1 p-2 relative"><div id="marginTrendChart" class="absolute inset-0"></div></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+
+        <!-- Industry View -->
+        <main class="dashboard-view flex-1 overflow-y-auto hidden" id="industryView">
+            <div class="industry-canvas">
+                <div class="panel mb-6 p-0 flex flex-col">
+                    <div class="p-4 border-b border-[var(--panel-border)] bg-[rgba(255,255,255,0.01)] flex items-center justify-between">
+                        <h3 class="text-[11px] font-bold text-gray-400 uppercase tracking-[1.5px] m-0">Industry Chain Map</h3>
+                        <span class="text-[9px] font-bold text-gray-500 uppercase tracking-widest border border-[var(--panel-border)] px-2 py-1 rounded-sm bg-[var(--app-bg)]">Interactive</span>
+                    </div>
+                    <div class="p-4">
+                        <div class="flex items-center justify-between gap-4 mb-3">
+                            <div class="text-[10px] text-gray-500 uppercase tracking-wider">Hover for directional flow; click node for details</div>
+                            <div class="industry-flow-legend">
+                                <span class="industry-flow-legend-item"><span class="industry-flow-swatch inflow"></span>Inflow</span>
+                                <span class="industry-flow-legend-item"><span class="industry-flow-swatch outflow"></span>Outflow</span>
+                            </div>
+                        </div>
+                        <div id="industryChainChart" class="w-full h-[860px]"></div>
+                    </div>
+                </div>
+
+                <div class="panel p-0 flex flex-col">
+                    <div class="p-4 border-b border-[var(--panel-border)] bg-[rgba(255,255,255,0.01)]">
+                        <h3 class="text-[11px] font-bold text-gray-400 uppercase tracking-[1.5px] m-0">Node Detail</h3>
+                    </div>
+                    <div class="p-4" id="industryNodeDetail">
+                        <div class="industry-detail-text text-gray-400">Select a node in the chart to view full node details and flow links.</div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <main class="flex-1 overflow-y-auto hidden" id="glossaryView">
+            <div id="glossaryViewContent" class="w-full"></div>
+        </main>
+    </div>
+    </div>
+    </div>
+
+    <script src="stock-data.js"></script>
+    <script src="llm-config.js"></script>
+    <script src="TMT/tmt-context.js"></script>
+    <script src="TMT/industry-chain-data.js"></script>
+    <script src="TMT/tmt-industry.js"></script>
+    <script src="TMT/tmt-glossary-data.js"></script>
+    <script src="TMT/tmt-glossary.js"></script>
+    <script src="home/home-view.js"></script>
+    <script>
+        const STOCK_DATA = window.StockDashboardData || {};
+        let chartMap = {};
+        let globalRawPriceData = [];
+        let globalRawBenchData = [];
+        let isSidebarCollapsed = false;
+        let currentChartRange = '1M';
+        const selectedMovingAverages = new Set();
+        let activeIndustryKey = null;
+
+        // Dark Theme Colors for ECharts
+        const theme = {
+            bg: 'transparent',
+            text: '#8b949e',
+            border: '#262a36',
+            lineGrowth: '#4b5563', // Gray for secondary lines
+            chartGreen: '#22c55e',
+            chartBlue: '#3b82f6',
+            chartPurple: '#8b5cf6',
+            chartOrange: '#f59e0b'
+        };
+
+        function setRibbonState(tabId) {
+            document.getElementById('ribbonHome').classList.toggle('active', tabId === 'home');
+            document.getElementById('ribbonIndustries').classList.toggle('active', tabId === 'industry');
+        }
+
+        function escapeHtmlText(value) {
+            return String(value ?? '')
+                .replaceAll('&', '&amp;')
+                .replaceAll('<', '&lt;')
+                .replaceAll('>', '&gt;')
+                .replaceAll('"', '&quot;')
+                .replaceAll("'", '&#39;');
+        }
+
+        function getIndustryEntries() {
+            const mods = window.IndustryModules || {};
+            return Object.keys(mods)
+                .sort()
+                .map(key => ({ key, mod: mods[key] }));
+        }
+
+        function renderIndustryDropdown() {
+            const dropdown = document.getElementById('industryDropdown');
+            if(!dropdown) return;
+            const entries = getIndustryEntries();
+            if(!entries.length) {
+                dropdown.innerHTML = `<div class="industry-option">No industries loaded</div>`;
+                return;
+            }
+            dropdown.innerHTML = entries.map(({ key, mod }) => {
+                const label = escapeHtmlText(mod?.label || key);
+                return `<button type="button" class="industry-option" onclick="selectIndustry('${key}')">${label}</button>`;
+            }).join('');
+        }
+
+        function ensureIndustrySelection() {
+            if(activeIndustryKey) return;
+            const first = getIndustryEntries()[0];
+            if(first) applyIndustryContext(first.key);
+        }
+
+        function initHomeView() {
+            if(window.HomePageModule && typeof window.HomePageModule.renderHomeView === 'function') {
+                window.HomePageModule.renderHomeView({
+                    containerId: 'homeViewContent',
+                    industryEntries: getIndustryEntries(),
+                    onSelectIndustry: selectIndustry
+                });
+                return;
+            }
+            const homeHost = document.getElementById('homeViewContent');
+            if(homeHost) homeHost.innerHTML = '<div class="text-gray-400 text-sm p-6">Home module not loaded.</div>';
+        }
+
+        function applyIndustryContext(industryKey) {
+            const mod = window.IndustryModules?.[industryKey];
+            if(!mod) return;
+            activeIndustryKey = industryKey;
+            document.getElementById('sidebarSectorTitle').innerText = mod.sidebar?.title || `${industryKey} SECTOR`;
+            document.getElementById('sidebarSectorSubtitle').innerText = mod.sidebar?.subtitle || 'Industry Module';
+            renderIndustryDropdown();
+        }
+
+        function selectIndustry(industryKey) {
+            applyIndustryContext(industryKey);
+            const focusedEl = document.activeElement;
+            if(focusedEl && typeof focusedEl.blur === 'function') focusedEl.blur();
+            setSidebarCollapsed(true);
+            const industryNav = document.querySelectorAll('.nav-item')[0];
+            switchTab('industry', industryNav);
+        }
+
+        function openHomeFromRibbon() {
+            switchTab('home');
+        }
+
+        // UI Interactions
+        function setSidebarCollapsed(collapsed) {
+            const sb = document.getElementById('sidebar');
+            const shell = document.getElementById('appShell');
+            isSidebarCollapsed = collapsed;
+            sb.classList.toggle('collapsed', collapsed);
+            shell.classList.toggle('collapsed', collapsed);
+        }
+
+        function toggleSidebar() {
+            setSidebarCollapsed(!isSidebarCollapsed);
+            setTimeout(() => Object.values(chartMap).forEach(c => c.resize()), 300);
+        }
+
+        function toggleMADropdown(event) {
+            event.stopPropagation();
+            document.getElementById('maDropdown').classList.toggle('open');
+        }
+
+        function handleMAToggle(event) {
+            const value = event.target.value;
+            if(event.target.checked) selectedMovingAverages.add(value);
+            else selectedMovingAverages.delete(value);
+            updateMADropdownLabel();
+            filterAndRenderPriceChart(currentChartRange);
+        }
+
+        function updateMADropdownLabel() {
+            const label = document.querySelector('#maToggle span');
+            if(selectedMovingAverages.size === 0) {
+                label.textContent = 'MAs';
+                return;
+            }
+            label.textContent = Array.from(selectedMovingAverages)
+                .sort((a, b) => Number(a) - Number(b))
+                  .map(v => `MA${v}`)
+                  .join(', ');
+        }
+
+        function getLocalTickerPayload(ticker) {
+            const key = String(ticker || '').trim().toUpperCase();
+            const payload = STOCK_DATA[key];
+            if(!payload) {
+                throw new Error(`Ticker ${key} is not in stock-data.js. Run generate_stock_data.py and regenerate the local dataset.`);
+            }
+            return JSON.parse(JSON.stringify(payload));
+        }
+
+        function switchTab(tabId, triggerEl = null) {
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            if(triggerEl) triggerEl.classList.add('active');
+            document.getElementById('appShell').classList.toggle('home-mode', tabId === 'home');
+            
+            document.getElementById('homeView').classList.add('hidden');
+            document.getElementById('dashboardView').classList.add('hidden');
+            document.getElementById('industryView').classList.add('hidden');
+            document.getElementById('glossaryView').classList.add('hidden');
+            
+            document.getElementById(`${tabId}View`).classList.remove('hidden');
+            setRibbonState(tabId);
+            if(tabId === 'home') initHomeView();
+            if(tabId === 'industry') initIndustryChainView();
+            if(tabId === 'glossary') initGlossaryView();
+            setTimeout(() => Object.values(chartMap).forEach(c => c.resize()), 80);
+        }
+
+        function initIndustryChainView() {
+            const detailEl = document.getElementById('industryNodeDetail');
+            ensureIndustrySelection();
+            const industryMod = window.IndustryModules?.[activeIndustryKey];
+            if(!industryMod || typeof industryMod.renderIndustryChainView !== 'function') {
+                detailEl.innerHTML = `<div class="industry-detail-text text-red-400">Industry module not found: ${activeIndustryKey}</div>`;
+                return;
+            }
+            industryMod.renderIndustryChainView({
+                chartId: 'industryChainChart',
+                detailId: 'industryNodeDetail',
+                initChart,
+                chartMap
+            });
+        }
+
+        function initGlossaryView() {
+            ensureIndustrySelection();
+            const glossaryHost = document.getElementById('glossaryViewContent');
+            const industryMod = window.IndustryModules?.[activeIndustryKey];
+            if(!industryMod || typeof industryMod.renderGlossaryView !== 'function') {
+                if(glossaryHost) {
+                    glossaryHost.innerHTML = `<div class="p-8 text-sm text-red-400">Glossary module not found: ${escapeHtmlText(activeIndustryKey)}</div>`;
+                }
+                return;
+            }
+            industryMod.renderGlossaryView({
+                containerId: 'glossaryViewContent',
+                industryKey: activeIndustryKey
+            });
+        }
+
+        function handleEnter(e) { if(e.key === 'Enter') fetchData(); }
+
+        // Data Fetching
+        async function fetchData() {
+            const ticker = document.getElementById('tickerInput').value.trim().toUpperCase();
+            if(!ticker) return;
+
+            document.getElementById('loading').classList.remove('hidden');
+            
+            // Ensure we are on the dashboard tab
+            const dashboardNav = document.querySelectorAll('.nav-item')[1];
+            switchTab('dashboard', dashboardNav);
+            // Fake active state on sidebar since we programmatically switched
+
+            try {
+                const data = getLocalTickerPayload(ticker);
+                renderDashboard(data);
+                document.getElementById('dashboardView').classList.remove('hidden');
+                setTimeout(() => Object.values(chartMap).forEach(c => c.resize()), 100);
+            } catch (err) {
+                console.error(err);
+                alert("Terminal Execution Error.\n\n" + err.message);
+            } finally {
+                document.getElementById('loading').classList.add('hidden');
+            }
+        }
+
+        function renderDashboard(data) {
+            // Header Info
+            document.getElementById('stockTicker').innerText = `(${data.info.symbol})`;
+            document.getElementById('stockName').innerText = data.info.name;
+            
+            const fmt = (v) => (v && v !== Infinity) ? v.toFixed(2) : '-';
+            const price = data.info.price || 0;
+            document.getElementById('val-price').innerText = price ? price.toFixed(2) : '-';
+
+            // Store global history for filtering
+            globalRawPriceData = data.price_history || [];
+            globalRawBenchData = data.benchmark_history || [];
+
+            // Calculate Daily Change (last vs prev close)
+            if(globalRawPriceData.length >= 2) {
+                const last = globalRawPriceData[globalRawPriceData.length - 1].close;
+                const prev = globalRawPriceData[globalRawPriceData.length - 2].close;
+                const chg = last - prev;
+                const chgPct = (chg / prev) * 100;
+                
+                const chgEl = document.getElementById('val-change');
+                const sign = chg >= 0 ? '+' : '';
+                const icon = chg >= 0 ? '<i class="fa-solid fa-arrow-up text-sm"></i>' : '<i class="fa-solid fa-arrow-down text-sm"></i>';
+                const colorCls = chg >= 0 ? 'text-[var(--accent-green)]' : 'text-[var(--accent-red)]';
+                
+                chgEl.className = `text-lg font-semibold leading-none flex items-center gap-1 ${colorCls}`;
+                chgEl.innerHTML = `${icon} ${sign}${chg.toFixed(2)} (${sign}${chgPct.toFixed(2)}%)`;
+            }
+
+            // Snapshot Metrics
+            const m1 = data.info.metrics_1y;
+            const m5 = data.info.metrics_5y;
+            
+            document.getElementById('val-eps').innerText = fmt(m1.eps);
+            document.getElementById('val-pe').innerText = fmt(m1.pe);
+            document.getElementById('val-peg-5y').innerText = fmt(m5.peg);
+            
+            document.getElementById('note-eps').innerText = m1.q_str ? `Weighted NTM (${m1.q_str})` : `Weighted NTM`;
+            document.getElementById('note-growth-5y').innerText = m5.growth ? `5Y Avg Growth: ${m5.growth.toFixed(1)}%` : `5Y Avg Growth: N/A`;
+
+            // Relative Returns Logic
+            renderComparison(globalRawPriceData, globalRawBenchData);
+
+            // Setup Time Filters for Chart
+            setupChartFilters();
+            
+            // Initial Chart Render (Default 1M)
+            filterAndRenderPriceChart('1M');
+
+            // Financial Tables & Charts (Annual)
+            renderFinancials(data.financials.annual || []);
+        }
+
+        // Returns Calculation
+        function renderComparison(stockHist, benchHist) {
+            const container = document.getElementById('comparisonTableContainer');
+            if(!stockHist || stockHist.length < 2) { container.innerHTML = ''; return; }
+            
+            const getChg = (hist, days) => {
+                if(hist.length < days) return null;
+                const curr = hist[hist.length-1].close;
+                const prev = hist[hist.length-1-days].close;
+                return (curr - prev) / prev;
+            };
+
+            const periods = [{l: "1M", d: 21}, {l: "3M", d: 63}, {l: "6M", d: 126}, {l: "1Y", d: 252}];
+            
+            let html = `<table class="w-full text-[13px] font-['Montserrat']" style="border-collapse:separate; border-spacing:0 16px;">`;
+            periods.forEach(p => {
+                const sChg = getChg(stockHist, p.d);
+                const bChg = benchHist ? getChg(benchHist, p.d) : (sChg * 0.5); // Fallback mock relative
+                if(sChg !== null) {
+                    const sCls = sChg >= 0 ? 'text-[var(--accent-green)]' : 'text-[var(--accent-red)]';
+                    const bText = bChg !== null ? (bChg*100).toFixed(1)+"%" : "-";
+                    html += `<tr>
+                                <td class="font-bold text-[var(--text-main)] tracking-[1px] text-[11px] uppercase w-1/4">${p.l}</td>
+                                <td class="text-right font-bold text-[14px] ${sCls} w-1/3">${(sChg*100).toFixed(1)}%</td>
+                                <td class="text-center text-[10px] text-[var(--text-muted)] w-1/6 font-semibold uppercase">vs</td>
+                                <td class="text-right font-medium text-[var(--text-muted)] w-1/4">${bText}</td>
+                             </tr>`;
+                }
+            });
+            html += `</table>`;
+            container.innerHTML = html;
+        }
+
+        function getYTDTradingDays(hist) {
+            if(!hist.length) return 0;
+            const currentYear = new Date(hist[hist.length-1].date).getFullYear();
+            let count = 0;
+            for(let i = hist.length-1; i >= 0; i--) {
+                if(new Date(hist[i].date).getFullYear() === currentYear) count++;
+                else break;
+            }
+            return count;
+        }
+
+        // Price Chart Filtering
+        function setupChartFilters() {
+            const btns = document.querySelectorAll('.time-btn');
+            btns.forEach(btn => {
+                btn.onclick = (e) => {
+                    btns.forEach(b => b.classList.remove('active'));
+                    e.target.classList.add('active');
+                    currentChartRange = e.target.dataset.range;
+                    filterAndRenderPriceChart(e.target.dataset.range);
+                };
+            });
+        }
+
+        function filterAndRenderPriceChart(range) {
+            if(!globalRawPriceData.length) return;
+            currentChartRange = range;
+            
+            let days = globalRawPriceData.length; // MAX
+            if(range === '1M') days = 21;
+            else if(range === '3M') days = 63;
+            else if(range === '6M') days = 126;
+            else if(range === 'YTD') days = getYTDTradingDays(globalRawPriceData);
+            else if(range === '1Y') days = 252;
+
+            const sliceP = globalRawPriceData.slice(-days);
+            const dates = sliceP.map(p => p.date);
+            const valsP = sliceP.map(p => Number(p.close.toFixed(2)));
+            const ma20 = calculateMovingAverage(globalRawPriceData, 20, days);
+            const ma50 = calculateMovingAverage(globalRawPriceData, 50, days);
+            const ma200 = calculateMovingAverage(globalRawPriceData, 200, days);
+
+            // Calculate min/max for dynamic Y axis
+            const optionalSeries = [];
+            if(selectedMovingAverages.has('20')) optionalSeries.push(...ma20);
+            if(selectedMovingAverages.has('50')) optionalSeries.push(...ma50);
+            if(selectedMovingAverages.has('200')) optionalSeries.push(...ma200);
+            const allVals = [...valsP, ...optionalSeries].filter(v => typeof v === 'number' && !isNaN(v));
+            const min = Math.floor(Math.min(...allVals) * 0.95);
+            const max = Math.ceil(Math.max(...allVals) * 1.05);
+            const series = [
+                { 
+                    name: 'Price', type: 'line', data: valsP, showSymbol: false, 
+                    itemStyle: { color: theme.chartGreen }, lineStyle: { width: 2 },
+                    areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{offset: 0, color: 'rgba(34, 197, 94, 0.15)'}, {offset: 1, color: 'rgba(34, 197, 94, 0.0)'}]) } 
+                }
+            ];
+
+            if(selectedMovingAverages.has('20')) {
+                series.push({
+                    name: 'MA20', type: 'line', data: ma20, showSymbol: false,
+                    itemStyle: { color: theme.chartBlue }, lineStyle: { width: 1.5, type: 'solid' }
+                });
+            }
+            if(selectedMovingAverages.has('50')) {
+                series.push({
+                    name: 'MA50', type: 'line', data: ma50, showSymbol: false,
+                    itemStyle: { color: theme.chartOrange }, lineStyle: { width: 1.5, type: 'solid' }
+                });
+            }
+            if(selectedMovingAverages.has('200')) {
+                series.push({
+                    name: 'MA200', type: 'line', data: ma200, showSymbol: false,
+                    itemStyle: { color: theme.chartPurple }, lineStyle: { width: 1.5, type: 'dashed' }
+                });
+            }
+            
+            initChart('priceChart', {
+                tooltip: { trigger: 'axis', backgroundColor: '#14171f', borderColor: '#262a36', textStyle: { fontFamily: 'Montserrat', color: '#f3f4f6', fontSize: 11 } },
+                grid: { top: 10, bottom: 25, left: 45, right: 15 },
+                xAxis: { 
+                    type: 'category', data: dates, 
+                    axisLabel: { color: theme.text, fontFamily: 'Montserrat', fontSize: 10 },
+                    axisLine: { lineStyle: { color: theme.border } }
+                },
+                yAxis: { 
+                    type: 'value', min: min, max: max,
+                    splitLine: { lineStyle: { color: theme.border, type: 'dashed' } }, 
+                    axisLabel: { color: theme.text, fontFamily: 'Montserrat', fontSize: 10 } 
+                },
+                series: series
+            });
+        }
+
+        function calculateMovingAverage(fullHist, windowSize, visibleDays) {
+            const startIndex = Math.max(fullHist.length - visibleDays, 0);
+            return fullHist.slice(startIndex).map((_, idx) => {
+                const fullIdx = startIndex + idx;
+                const start = fullIdx - windowSize + 1;
+                if(start < 0) return null;
+                const window = fullHist.slice(start, fullIdx + 1).map(point => point.close).filter(v => typeof v === 'number');
+                if(window.length < windowSize) return null;
+                const avg = window.reduce((sum, val) => sum + val, 0) / window.length;
+                return Number(avg.toFixed(2));
+            });
+        }
+
+        // Financials Processing
+        function renderFinancials(histData) {
+            histData = histData.filter(d => d.revenue != null || d.net_income != null || d.operating_income != null);
+            histData.sort((a,b) => a.date.localeCompare(b.date)); 
+            
+            const periods = histData.map(d => d.date.substring(0,4)); 
+            const getD = (key) => histData.map(d => d[key]);
+            
+            const revs = getD('revenue');
+            const gps = getD('gross_profit');
+            const opincs = getD('operating_income');
+            const netincs = getD('net_income');
+            const capexs = getD('capex');
+
+            const calcYoY = (vals) => vals.map((val, i) => i === 0 || !vals[i-1] ? null : (val - vals[i-1]) / Math.abs(vals[i-1]));
+            
+            const revYoY = calcYoY(revs);
+            const netYoY = calcYoY(netincs);
+            const capexYoY = calcYoY(capexs);
+
+            const safeDiv = (n, d) => (n && d) ? (n/d) : null;
+            const gms = revs.map((r, i) => safeDiv(gps[i], r));
+            const oms = revs.map((r, i) => safeDiv(opincs[i], r));
+            const nms = revs.map((r, i) => safeDiv(netincs[i], r));
+
+            // Tables
+            const createRow = (label, dataArray, options = {}) => ({
+                l: label,
+                d: dataArray,
+                y: calcYoY(dataArray),
+                f: "num",
+                isHeader: Boolean(options.isHeader),
+                isMajor: Boolean(options.isMajor)
+            });
+            
+            renderAdvancedTable("incomeTableContainer", [
+                createRow("Total Revenue", revs, { isHeader: true, isMajor: true }),
+                createRow("Gross Profit", gps, { isMajor: true }),
+                createRow("Operating Income", opincs, { isMajor: true }),
+                createRow("Net Income", netincs, { isMajor: true }),
+                createRow("CAPEX", capexs, { isMajor: true })
+            ], periods);
+
+            renderAdvancedTable("marginTableContainer", [
+                { l: "Gross Margin", d: gms, f: "pct", isMajor: true },
+                { l: "Operating Margin", d: oms, f: "pct", isMajor: true },
+                { l: "Net Margin", d: nms, f: "pct", isMajor: true }
+            ], periods);
+
+            // Combo Charts
+            initComboChart('revGrowthChart', periods, revs, revYoY, theme.chartGreen);
+            initComboChart('niGrowthChart', periods, netincs, netYoY, theme.chartBlue);
+            initComboChart('capexChart', periods, capexs, capexYoY, theme.chartPurple);
+            
+            // Margin Line Chart
+            initLineChart('marginTrendChart', periods, [
+                {name: 'Gross Margin', data: gms, color: theme.chartGreen},
+                {name: 'Op Margin', data: oms, color: theme.chartOrange},
+                {name: 'Net Margin', data: nms, color: theme.chartBlue}
+            ]);
+        }
+
+        // Table Builder
+        function renderAdvancedTable(id, rows, periods) {
+            let h = `<table class="custom-table"><thead><tr><th>Metric</th>`;
+            periods.forEach(p => h += `<th>${p}</th>`);
+            h += `</tr></thead><tbody>`;
+            rows.forEach(row => {
+                if(!row.d || row.d.every(v => v===null)) return;
+                const trClass = row.isHeader ? 'row-header' : (row.isMajor ? 'row-major' : '');
+                h += `<tr class="${trClass}"><td>${row.l}</td>`;
+                row.d.forEach(v => {
+                    let d = "-";
+                    if(v !== null && v !== undefined) d = row.f === 'num' ? (v/1000000).toLocaleString(undefined, {maximumFractionDigits:0}) : (v*100).toFixed(1)+"%";
+                    h += `<td>${d}</td>`;
+                });
+                h += `</tr>`;
+                if(row.y) {
+                    h += `<tr class="row-sub"><td>Y/Y Growth</td>`;
+                    row.y.forEach(v => {
+                        let d = "-"; let cls = "";
+                        if(v !== null) { d = (v*100).toFixed(1)+"%"; cls = v < 0 ? "text-down" : "text-up"; }
+                        h += `<td class="${cls}">${d}</td>`;
+                    });
+                    h += `</tr>`;
+                }
+            });
+            h += `</tbody></table>`;
+            document.getElementById(id).innerHTML = h;
+        }
+
+        // Generic Chart Initializers
+        function initChart(id, option) {
+            const dom = document.getElementById(id);
+            if(!dom) return;
+            if(chartMap[id]) chartMap[id].dispose();
+            const chart = echarts.init(dom);
+            chart.setOption(option);
+            chartMap[id] = chart;
+        }
+
+        function initComboChart(id, periods, bars, lines, barColor) {
+            const barData = bars.map(v => v ? v/1000000 : null);
+            const lineData = lines.map(v => v !== null ? (v*100).toFixed(1) : null);
+            initChart(id, {
+                tooltip: { trigger: 'axis', backgroundColor: '#14171f', borderColor: theme.border, textStyle: { fontFamily: 'Montserrat', color: theme.text, fontSize: 10 } },
+                grid: { top: 15, bottom: 20, left: 35, right: 30 }, 
+                xAxis: { type: 'category', data: periods, axisLabel: { color: theme.text, fontFamily: 'Montserrat', fontSize: 9 }, axisTick: { show: false }, axisLine:{lineStyle:{color:theme.border}} },
+                yAxis: [
+                    { type: 'value', splitLine: { lineStyle: { type: 'dashed', color: theme.border } }, axisLabel: { color: theme.text, fontFamily: 'Montserrat', fontSize: 9, formatter: (val) => val >= 1000 ? (val/1000)+'k' : val } },
+                    { type: 'value', splitLine: { show: false }, axisLabel: { formatter: '{value}%', color: theme.text, fontFamily: 'Montserrat', fontSize: 9 } }
+                ],
+                series: [
+                    { type: 'bar', data: barData, yAxisIndex: 0, itemStyle: { color: barColor, borderRadius: [2, 2, 0, 0] }, barMaxWidth: 16 },
+                    { type: 'line', data: lineData, yAxisIndex: 1, itemStyle: { color: theme.lineGrowth }, smooth: false, symbolSize: 4, lineStyle: { width: 1.5 } }
+                ]
+            });
+        }
+
+        function initLineChart(id, periods, seriesData) {
+            const series = seriesData.map(s => ({ 
+                name: s.name, type: 'line', data: s.data ? s.data.map(v => v ? (v*100).toFixed(1) : null) : [], 
+                itemStyle: { color: s.color }, smooth: false, symbol: 'circle', symbolSize: 4, lineStyle: {width: 2} 
+            }));
+            initChart(id, {
+                tooltip: { trigger: 'axis', backgroundColor: '#14171f', borderColor: theme.border, textStyle: { fontFamily: 'Montserrat', color: '#f3f4f6', fontSize: 10 }, formatter: function(params) { let res = params[0].name + '<br/>'; params.forEach(p => res += `<span style="color:${p.color}">●</span> <span style="font-size:10px; font-weight:500;">${p.seriesName}: ${p.value}%</span><br/>`); return res; }},
+                grid: { top: 15, bottom: 20, left: 35, right: 15 }, 
+                xAxis: { type: 'category', data: periods, axisLabel: { color: theme.text, fontFamily: 'Montserrat', fontSize: 9 }, axisLine:{lineStyle:{color:theme.border}} },
+                yAxis: { type: 'value', axisLabel: { formatter: '{value}%', color: theme.text, fontFamily: 'Montserrat', fontSize: 9 }, splitLine: { lineStyle: { type: 'dashed', color: theme.border } } },
+                series: series
+            });
+        }
+
+        window.addEventListener('resize', () => Object.values(chartMap).forEach(c => c.resize()));
+        document.addEventListener('click', (event) => {
+            const dropdown = document.getElementById('maDropdown');
+            if(dropdown && !dropdown.contains(event.target)) dropdown.classList.remove('open');
+        });
+        updateMADropdownLabel();
+        renderIndustryDropdown();
+        ensureIndustrySelection();
+        initHomeView();
+        switchTab('home');
+    </script>
+  </body>
+</html>
