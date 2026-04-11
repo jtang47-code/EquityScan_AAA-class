@@ -668,38 +668,43 @@
             background: rgba(116, 164, 170, 0.84);
         }
 
-        .app-shell.home-mode {
+        .app-shell.standalone-mode {
             --sidebar-width: 220px;
             --right-pane-width: calc(100vw - 220px);
         }
 
-        .app-shell.home-mode .top-frame {
+        .app-shell.standalone-mode .top-frame {
             grid-template-columns: 220px calc(100vw - 220px);
         }
 
-        .app-shell.home-mode .brand-bar {
+        .app-shell.standalone-mode .brand-bar {
             opacity: 1;
             pointer-events: auto;
             padding: 0 20px;
             justify-content: flex-start;
         }
 
-        .app-shell.home-mode .logo-quity,
-        .app-shell.home-mode .logo-can {
+        .app-shell.standalone-mode .logo-quity,
+        .app-shell.standalone-mode .logo-can {
             max-width: 9ch;
             opacity: 1;
         }
 
-        .app-shell.home-mode .sidebar {
+        .app-shell.standalone-mode .sidebar {
             width: 0;
             border-right: 0;
             opacity: 0;
             pointer-events: none;
         }
 
-        .app-shell.home-mode .main-pane {
+        .app-shell.standalone-mode .main-pane {
             width: 100vw;
             flex-basis: 100vw;
+        }
+
+        .app-shell.home-mode #ribbonSearchArea {
+            opacity: 0;
+            pointer-events: none;
         }
 
     </style>
@@ -726,15 +731,16 @@
                         <span id="ribbonIndustries" class="ribbon-link">Industries</span>
                         <div id="industryDropdown" class="industry-dropdown"></div>
                     </div>
+                    <span id="ribbonDashboard" class="ribbon-link" onclick="openDashboardFromRibbon()">Dashboard</span>
                 </div>
             </div>
 
-            <div class="flex items-center gap-6">
-                <div class="relative">
-                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs"></i>
-                    <input type="text" id="tickerInput" class="search-input" placeholder="Search ticker or company..." onkeypress="handleEnter(event)">
-                </div>
-            </div>
+            <div class="flex items-center gap-6" id="ribbonSearchArea">
+                  <div class="relative">
+                      <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs"></i>
+                      <input type="text" id="tickerInput" class="search-input" placeholder="Search ticker or company..." onkeypress="handleEnter(event)">
+                  </div>
+              </div>
         </header>
     </div>
 
@@ -755,15 +761,18 @@
             </div>
 
             <!-- Navigation Links -->
-            <nav class="flex-1 py-4 flex flex-col gap-1">
-                <div class="nav-item" onclick="switchTab('industry', this)">
-                    <i class="fa-solid fa-diagram-project w-5 text-center"></i><span class="nav-label">INDUSTRY CHAIN</span>
-                </div>
-                <div class="nav-item" onclick="switchTab('dashboard', this)">
-                    <i class="fa-solid fa-chart-simple w-5 text-center"></i><span class="nav-label">DASHBOARD</span>
-                </div>
-                <div class="nav-item" onclick="switchTab('glossary', this)">
+              <nav class="flex-1 py-4 flex flex-col gap-1">
+                  <div class="nav-item" id="navIndustry" onclick="switchTab('industry', this)">
+                      <i class="fa-solid fa-diagram-project w-5 text-center"></i><span class="nav-label">INDUSTRY CHAIN</span>
+                  </div>
+                  <div class="nav-item" id="navCompanies" onclick="switchTab('companies', this)">
+                      <i class="fa-solid fa-building w-5 text-center"></i><span class="nav-label">COMPANIES</span>
+                  </div>
+                <div class="nav-item" id="navGlossary" onclick="switchTab('glossary', this)">
                     <i class="fa-solid fa-book-bookmark w-5 text-center"></i><span class="nav-label">GLOSSARY</span>
+                </div>
+                <div class="nav-item" id="navMaster" onclick="switchTab('master', this)">
+                    <i class="fa-solid fa-brain w-5 text-center"></i><span class="nav-label">MASTER TMT</span>
                 </div>
             </nav>
     </aside>
@@ -811,6 +820,9 @@
                         </div>
                     </div>
                 </div>
+
+                <div id="dashboardCompanyContext" class="dashboard-company-context hidden"></div>
+                <div id="dashboardAgentCWidget"></div>
 
                 <!-- 1. Forward Valuation Outlook (Full Width) -->
                 <div class="panel mb-6 p-0 flex flex-col">
@@ -974,26 +986,41 @@
                         <div class="industry-detail-text text-gray-400">Select a node in the chart to view full node details and flow links.</div>
                     </div>
                 </div>
+                <div id="industryAgentIWidget"></div>
             </div>
         </main>
 
         <main class="flex-1 overflow-y-auto hidden" id="glossaryView">
             <div id="glossaryViewContent" class="w-full"></div>
         </main>
+
+        <main class="flex-1 overflow-y-auto hidden" id="companiesView">
+            <div id="companiesViewContent" class="w-full"></div>
+        </main>
+        <main class="flex-1 overflow-y-auto hidden" id="masterView">
+            <div id="masterViewContent" class="w-full"></div>
+        </main>
     </div>
     </div>
     </div>
 
-    <script src="stock-data.js"></script>
-    <script src="llm-config.js"></script>
+    <script src="app-config.js"></script>
+    <script src="llm_shell/client.js"></script>
+    <script src="llm_shell/workflows.js"></script>
+    <script src="llm_shell/config.js"></script>
     <script src="TMT/tmt-context.js"></script>
+    <script src="TMT/tmt-company-directory-data.js"></script>
     <script src="TMT/industry-chain-data.js"></script>
+    <script src="TMT/tmt-company-directory.js"></script>
     <script src="TMT/tmt-industry.js"></script>
     <script src="TMT/tmt-glossary-data.js"></script>
     <script src="TMT/tmt-glossary.js"></script>
-    <script src="home/home-view.js"></script>
+    <script src="TMT/tmt-master.js"></script>
+    <script src="home/home-view.js?v=20260405i"></script>
     <script>
-        const STOCK_DATA = window.StockDashboardData || {};
+        const API_BASE_URL = window.APP_CONFIG?.apiBaseUrl
+            || (window.location.protocol === 'file:' ? 'http://localhost:8000' : '');
+        const API_URL = `${API_BASE_URL}/api/stock`;
         let chartMap = {};
         let globalRawPriceData = [];
         let globalRawBenchData = [];
@@ -1016,7 +1043,8 @@
 
         function setRibbonState(tabId) {
             document.getElementById('ribbonHome').classList.toggle('active', tabId === 'home');
-            document.getElementById('ribbonIndustries').classList.toggle('active', tabId === 'industry');
+            document.getElementById('ribbonDashboard').classList.toggle('active', tabId === 'dashboard');
+            document.getElementById('ribbonIndustries').classList.toggle('active', tabId === 'industry' || tabId === 'glossary' || tabId === 'companies' || tabId === 'master');
         }
 
         function escapeHtmlText(value) {
@@ -1033,6 +1061,22 @@
             return Object.keys(mods)
                 .sort()
                 .map(key => ({ key, mod: mods[key] }));
+        }
+
+        function getSidebarNavByTab(tabId) {
+            return document.getElementById(`nav${tabId.charAt(0).toUpperCase()}${tabId.slice(1)}`);
+        }
+
+        function getCompanyModuleMatchByTicker(ticker) {
+            const normalized = String(ticker || '').trim().toUpperCase();
+            if(!normalized) return null;
+            const mods = window.IndustryModules || {};
+            for (const [industryKey, mod] of Object.entries(mods)) {
+                if (typeof mod.findCompanyByTicker !== 'function') continue;
+                const entry = mod.findCompanyByTicker(normalized);
+                if (entry) return { industryKey, mod, entry };
+            }
+            return null;
         }
 
         function renderIndustryDropdown() {
@@ -1060,7 +1104,8 @@
                 window.HomePageModule.renderHomeView({
                     containerId: 'homeViewContent',
                     industryEntries: getIndustryEntries(),
-                    onSelectIndustry: selectIndustry
+                    onSelectIndustry: selectIndustry,
+                    onSearchTicker: openDashboardForTicker
                 });
                 return;
             }
@@ -1088,6 +1133,17 @@
 
         function openHomeFromRibbon() {
             switchTab('home');
+        }
+
+        function openDashboardFromRibbon() {
+            switchTab('dashboard');
+        }
+
+        async function openDashboardForTicker(ticker, industryKey = null) {
+            if(industryKey) applyIndustryContext(industryKey);
+            const normalized = String(ticker || '').trim().toUpperCase();
+            document.getElementById('tickerInput').value = normalized;
+            await fetchData(normalized);
         }
 
         // UI Interactions
@@ -1125,34 +1181,45 @@
             }
             label.textContent = Array.from(selectedMovingAverages)
                 .sort((a, b) => Number(a) - Number(b))
-                  .map(v => `MA${v}`)
-                  .join(', ');
-        }
-
-        function getLocalTickerPayload(ticker) {
-            const key = String(ticker || '').trim().toUpperCase();
-            const payload = STOCK_DATA[key];
-            if(!payload) {
-                throw new Error(`Ticker ${key} is not in stock-data.js. Run generate_stock_data.py and regenerate the local dataset.`);
-            }
-            return JSON.parse(JSON.stringify(payload));
+                .map(v => `MA${v}`)
+                .join(', ');
         }
 
         function switchTab(tabId, triggerEl = null) {
             document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
             if(triggerEl) triggerEl.classList.add('active');
-            document.getElementById('appShell').classList.toggle('home-mode', tabId === 'home');
+            const appShell = document.getElementById('appShell');
+            appShell.classList.toggle('standalone-mode', tabId === 'home' || tabId === 'dashboard');
+            appShell.classList.toggle('home-mode', tabId === 'home');
             
             document.getElementById('homeView').classList.add('hidden');
             document.getElementById('dashboardView').classList.add('hidden');
             document.getElementById('industryView').classList.add('hidden');
             document.getElementById('glossaryView').classList.add('hidden');
+            document.getElementById('companiesView').classList.add('hidden');
+            document.getElementById('masterView').classList.add('hidden');
             
             document.getElementById(`${tabId}View`).classList.remove('hidden');
             setRibbonState(tabId);
             if(tabId === 'home') initHomeView();
+            if(tabId === 'dashboard') {
+                const agentIndustryKey = activeIndustryKey || 'TMT';
+                const agentMod = window.IndustryModules?.[agentIndustryKey];
+                const agentHost = document.getElementById('dashboardAgentCWidget');
+                if(agentHost && agentMod && typeof agentMod.renderCompanyAgentWidget === 'function') {
+                    agentMod.renderCompanyAgentWidget({
+                        containerId: 'dashboardAgentCWidget',
+                        industryKey: agentIndustryKey,
+                        onOpenTicker: openDashboardForTicker
+                    });
+                } else if(agentHost) {
+                    agentHost.innerHTML = '';
+                }
+            }
             if(tabId === 'industry') initIndustryChainView();
             if(tabId === 'glossary') initGlossaryView();
+            if(tabId === 'companies') initCompaniesView();
+            if(tabId === 'master') initMasterView();
             setTimeout(() => Object.values(chartMap).forEach(c => c.resize()), 80);
         }
 
@@ -1167,6 +1234,9 @@
             industryMod.renderIndustryChainView({
                 chartId: 'industryChainChart',
                 detailId: 'industryNodeDetail',
+                agentId: 'industryAgentIWidget',
+                industryKey: activeIndustryKey,
+                onOpenTicker: openDashboardForTicker,
                 initChart,
                 chartMap
             });
@@ -1188,22 +1258,67 @@
             });
         }
 
+        function initCompaniesView() {
+            ensureIndustrySelection();
+            const host = document.getElementById('companiesViewContent');
+            const industryMod = window.IndustryModules?.[activeIndustryKey];
+            if(!industryMod || typeof industryMod.renderCompanyDirectoryView !== 'function') {
+                if(host) {
+                    host.innerHTML = `<div class="p-8 text-sm text-red-400">Company directory module not found: ${escapeHtmlText(activeIndustryKey)}</div>`;
+                }
+                return;
+            }
+            industryMod.renderCompanyDirectoryView({
+                containerId: 'companiesViewContent',
+                industryKey: activeIndustryKey,
+                onOpenTicker: openDashboardForTicker
+            });
+        }
+
+        function initMasterView() {
+            ensureIndustrySelection();
+            const host = document.getElementById('masterViewContent');
+            const industryMod = window.IndustryModules?.[activeIndustryKey];
+            if(!industryMod || typeof industryMod.renderMasterView !== 'function') {
+                if(host) {
+                    host.innerHTML = `<div class="p-8 text-sm text-red-400">Master module not found: ${escapeHtmlText(activeIndustryKey)}</div>`;
+                }
+                return;
+            }
+            industryMod.renderMasterView({
+                containerId: 'masterViewContent',
+                industryKey: activeIndustryKey,
+                onOpenTicker: openDashboardForTicker,
+                onSwitchTab: switchTab
+            });
+        }
+
         function handleEnter(e) { if(e.key === 'Enter') fetchData(); }
 
         // Data Fetching
-        async function fetchData() {
-            const ticker = document.getElementById('tickerInput').value.trim().toUpperCase();
+        async function fetchData(overrideTicker = '') {
+            const ticker = String(overrideTicker || document.getElementById('tickerInput').value || '').trim().toUpperCase();
             if(!ticker) return;
+            document.getElementById('tickerInput').value = ticker;
 
             document.getElementById('loading').classList.remove('hidden');
             
             // Ensure we are on the dashboard tab
-            const dashboardNav = document.querySelectorAll('.nav-item')[1];
-            switchTab('dashboard', dashboardNav);
-            // Fake active state on sidebar since we programmatically switched
+            switchTab('dashboard');
 
             try {
-                const data = getLocalTickerPayload(ticker);
+                let data;
+                const res = await fetch(`${API_URL}?ticker=${ticker}`);
+                if(!res.ok) {
+                    let detail = "Backend error";
+                    try {
+                        const errData = await res.json();
+                        detail = errData?.detail || detail;
+                    } catch(_) {}
+                    throw new Error(detail);
+                }
+                data = await res.json();
+                
                 renderDashboard(data);
                 document.getElementById('dashboardView').classList.remove('hidden');
                 setTimeout(() => Object.values(chartMap).forEach(c => c.resize()), 100);
@@ -1216,6 +1331,8 @@
         }
 
         function renderDashboard(data) {
+            window.__equityscanDashboardSnapshot = data;
+
             // Header Info
             document.getElementById('stockTicker').innerText = `(${data.info.symbol})`;
             document.getElementById('stockName').innerText = data.info.name;
@@ -1266,6 +1383,31 @@
 
             // Financial Tables & Charts (Annual)
             renderFinancials(data.financials.annual || []);
+
+            const companyMatch = getCompanyModuleMatchByTicker(data.info.symbol);
+            if(companyMatch && typeof companyMatch.mod.renderDashboardCompanyContext === 'function') {
+                companyMatch.mod.renderDashboardCompanyContext({
+                    containerId: 'dashboardCompanyContext',
+                    ticker: data.info.symbol
+                });
+            } else {
+                const companyContextEl = document.getElementById('dashboardCompanyContext');
+                companyContextEl.innerHTML = '';
+                companyContextEl.classList.add('hidden');
+            }
+
+            const agentIndustryKey = activeIndustryKey || 'TMT';
+            const agentMod = window.IndustryModules?.[agentIndustryKey];
+            const agentHost = document.getElementById('dashboardAgentCWidget');
+            if(agentHost && agentMod && typeof agentMod.renderCompanyAgentWidget === 'function') {
+                agentMod.renderCompanyAgentWidget({
+                    containerId: 'dashboardAgentCWidget',
+                    industryKey: agentIndustryKey,
+                    onOpenTicker: openDashboardForTicker
+                });
+            } else if(agentHost) {
+                agentHost.innerHTML = '';
+            }
         }
 
         // Returns Calculation
@@ -1551,6 +1693,45 @@
         ensureIndustrySelection();
         initHomeView();
         switchTab('home');
+
+        // --- Mock Data Generator ---
+        function generateMockData(ticker) {
+            const today = new Date();
+            let priceHist = [], benchHist = [];
+            let p = 150, b = 100;
+            for(let i=500; i>=0; i--) {
+                const d = new Date(today); d.setDate(d.getDate() - i);
+                if (d.getDay() === 0 || d.getDay() === 6) continue; // Skip weekends
+                p = p * (1 + (Math.random()-0.48)*0.03);
+                b = b * (1 + (Math.random()-0.49)*0.02);
+                priceHist.push({ date: d.toISOString().split('T')[0], close: p });
+                benchHist.push({ date: d.toISOString().split('T')[0], close: b });
+            }
+
+            let aData = [];
+            let r = 50000;
+            for(let i=3; i>=0; i--) {
+                const d = new Date(today); d.setFullYear(d.getFullYear() - i);
+                r = r * (1 + (Math.random()-0.2)*0.15);
+                let ni = r * (0.15 + Math.random()*0.1);
+                aData.push({
+                    date: d.toISOString().split('T')[0],
+                    revenue: r, gross_profit: r * 0.6,
+                    operating_income: r * 0.3, net_income: ni,
+                    capex: r * 0.08
+                });
+            }
+
+            return {
+                info: {
+                    symbol: ticker, name: ticker + " Corporation", price: priceHist[priceHist.length-1].close,
+                    metrics_1y: { eps: aData[3].net_income/1000, pe: 24.5, q_str: "2026 Q2-Q4 + 2027 Q1" },
+                    metrics_5y: { peg: 1.15, growth: 21.3 }
+                },
+                price_history: priceHist, benchmark_history: benchHist,
+                financials: { annual: aData }
+            };
+        }
     </script>
-  </body>
+</body>
 </html>

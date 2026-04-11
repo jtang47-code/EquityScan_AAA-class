@@ -74,7 +74,7 @@ window.TMTGlossaryData = [
   { acronym: "IaaS", meaning: "Infrastructure as a Service", practicalExplanation: "Cloud based compute, storage, and networking resources." },
   { acronym: "IAM", meaning: "Identity and Access Management", practicalExplanation: "Systems used to control user access and permissions." },
   { acronym: "ICT", meaning: "Information and Communications Technology", practicalExplanation: "A broader policy or industry term often used outside the U.S. to describe the digital economy." },
-  { acronym: "IP", meaning: "Intellectual Property", practicalExplanation: "Reusable semiconductor design blocks such as CPU cores, interface blocks, and memory controllers." },
+  { acronym: "InP", meaning: "Indium Phosphide", practicalExplanation: "A compound semiconductor material used in high-frequency and optoelectronic devices. While silicon dominates most chips, InP is crucial for specialized applications like high-speed transistors, photonic integrated circuits, and components for fiber optic communications. In manufacturing, it's handled as a raw material or substrate for growing specialized semiconductor layers." },
   { acronym: "ISV", meaning: "Independent Software Vendor", practicalExplanation: "A company that develops and sells software, often into an enterprise ecosystem." },
   { acronym: "K8s", meaning: "Kubernetes", practicalExplanation: "A container orchestration platform widely used in cloud environments." },
   { acronym: "KGD", meaning: "Known Good Die", practicalExplanation: "A die verified to work before final package assembly." },
@@ -152,5 +152,5 @@ window.TMTGlossaryData = [
   { acronym: "WDM", meaning: "Wavelength Division Multiplexing", practicalExplanation: "A method of carrying multiple optical signals on one fiber." },
   { acronym: "WFE", meaning: "Wafer Fab Equipment", practicalExplanation: "Capital equipment used in semiconductor manufacturing." },
   { acronym: "XGS-PON", meaning: "10 Gigabit Symmetric Passive Optical Network", practicalExplanation: "A newer higher speed PON standard." },
-  { acronym: "YoY", meaning: "Year over Year", practicalExplanation: "Growth compared with the same period a year earlier." }
+  { acronym: "YoY", meaning: "Year over Year", practicalExplanation: "Growth compared with the same period a year earlier." },
 ];

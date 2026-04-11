@@ -4,6 +4,10 @@
   window.IndustryModules.TMT = moduleRef;
 
   let initialized = false;
+  const API_BASE_URL = window.APP_CONFIG?.apiBaseUrl || (window.location.protocol === "file:" ? "http://localhost:8000" : "");
+  const AGENT_PAD = 8;
+  const AGENT_DEFAULT_RIGHT = 28;
+  const AGENT_DEFAULT_BOTTOM = 24;
   const state = {
     nodesById: new Map(),
     flows: [],
@@ -11,7 +15,14 @@
     flowByNode: [],
     resizeObserver: null,
     resizeFrame: 0,
-    selectedNodeId: null
+    selectedNodeId: null,
+    chatOpen: false,
+    chatBusy: false,
+    chatMessages: [],
+    lastResolvedNodeId: null,
+    lastResolvedCompanyId: "",
+    pendingDashboardTicker: "",
+    chatDrag: { pointerId: null, startX: 0, startY: 0, originLeft: 0, originTop: 0, didMove: false }
   };
 
   function toNumber(v) {
@@ -26,6 +37,92 @@
       .replaceAll(">", "&gt;")
       .replaceAll('"', "&quot;")
       .replaceAll("'", "&#39;");
+  }
+
+  function normalize(value) {
+    return String(value ?? "").trim().toUpperCase();
+  }
+
+  function getCompanyEntries() {
+    return Array.isArray(window.TMTCompanyDirectoryData) ? window.TMTCompanyDirectoryData.slice() : [];
+  }
+
+  function enrichCompanyEntry(entry) {
+    if (!entry) return null;
+    return {
+      ...entry,
+      searchBlob: [
+        entry.company,
+        entry.parent,
+        entry.ticker,
+        entry.usTickerRaw,
+        entry.subsegment,
+        entry.summary
+      ].join(" ").toUpperCase()
+    };
+  }
+
+  function getCompanyById(entryId) {
+    return enrichCompanyEntry(getCompanyEntries().find((entry) => entry.id === entryId));
+  }
+
+  function getSelectedNode() {
+    return state.selectedNodeId ? state.nodesById.get(state.selectedNodeId) || null : null;
+  }
+
+  function getLastResolvedNode() {
+    return state.lastResolvedNodeId ? state.nodesById.get(state.lastResolvedNodeId) || null : null;
+  }
+
+  function getLastResolvedCompany() {
+    return getCompanyById(state.lastResolvedCompanyId);
+  }
+
+  function findCompanyByTicker(ticker) {
+    return enrichCompanyEntry(getCompanyEntries().find((entry) => normalize(entry.ticker) === normalize(ticker)));
+  }
+
+  function findCompanyCandidates(query, limit = 8) {
+    const normalized = normalize(query);
+    if (!normalized) return [];
+    const all = getCompanyEntries().map(enrichCompanyEntry);
+    const ranked = [];
+    all.forEach((entry) => {
+      if (!entry.searchBlob.includes(normalized)) return;
+      let score = 0;
+      if (normalize(entry.ticker) === normalized) score += 120;
+      if (normalize(entry.company) === normalized) score += 100;
+      if (normalize(entry.ticker).startsWith(normalized)) score += 80;
+      if (normalize(entry.company).startsWith(normalized)) score += 70;
+      if (entry.searchBlob.includes(normalized)) score += 30;
+      ranked.push({ score, entry });
+    });
+    return ranked
+      .sort((a, b) => b.score - a.score || a.entry.company.localeCompare(b.entry.company))
+      .slice(0, limit)
+      .map((item) => item.entry);
+  }
+
+  function extractTickerToken(value) {
+    const match = String(value || "").toUpperCase().match(/\b[A-Z][A-Z.\-]{0,5}\b/);
+    return match ? match[0] : "";
+  }
+
+  function getIndustryContext(industryKey) {
+    const mod = window.IndustryModules?.[industryKey] || moduleRef || {};
+    const source = window.TMTIndustryChainData || {};
+    const nodeRows = Array.isArray(source.nodes) ? source.nodes : [];
+    const flowRows = Array.isArray(source.flows) ? source.flows : [];
+    return {
+      key: String(industryKey || moduleRef.key || "TMT"),
+      label: String(mod.label || moduleRef.label || industryKey || "Industry"),
+      sidebarTitle: String(mod.sidebar?.title || ""),
+      chainContext: nodeRows.length
+        ? `Industry chain has ${nodeRows.length} nodes and ${flowRows.length} flows. Nodes include ${nodeRows.slice(0, 8).map((node) => `N${node["Node ID"]} ${node["Node Name"]}`).join("; ")}.`
+        : "",
+      glossaryContext: String(mod.glossary?.llmContext || ""),
+      companyContext: "Representative companies and major players are available from the TMT company directory and the chain node player lists."
+    };
   }
 
   function renderTable(title, headers, rows, emptyText) {
@@ -229,6 +326,261 @@
     document.head.appendChild(styleEl);
   }
 
+  function ensureAgentStyles() {
+    if (document.getElementById("tmt-industry-agent-style")) return;
+    const styleEl = document.createElement("style");
+    styleEl.id = "tmt-industry-agent-style";
+    styleEl.textContent = `
+      .industry-agent-launcher{position:fixed;right:28px;bottom:24px;width:58px;height:58px;border-radius:999px;border:1px solid rgba(94,234,212,.34);background:radial-gradient(circle at 30% 30%,rgba(94,234,212,.18),rgba(15,19,27,.98));color:#eefcfb;display:inline-flex;align-items:center;justify-content:center;box-shadow:0 18px 42px rgba(0,0,0,.42),0 0 0 1px rgba(94,234,212,.1);z-index:39;transition:opacity .22s ease,transform .22s ease;cursor:pointer}
+      .industry-agent-launcher.hidden{opacity:0;pointer-events:none;transform:translateY(10px) scale(.9)}
+      .industry-agent-chatbox{position:fixed;right:28px;bottom:24px;width:min(460px,calc(100vw - 24px));max-height:min(78vh,720px);border:1px solid rgba(94,234,212,.2);background:rgba(12,16,24,.98);box-shadow:0 26px 80px rgba(0,0,0,.52),0 0 0 1px rgba(94,234,212,.08);display:flex;flex-direction:column;overflow:hidden;z-index:40;transform-origin:bottom right;transition:opacity .22s ease,transform .22s ease}
+      .industry-agent-chatbox.collapsed{opacity:0;pointer-events:none;transform:translateY(16px) scale(.96);box-shadow:0 12px 28px rgba(0,0,0,.24)}
+      .industry-agent-header{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.06);background:linear-gradient(180deg,rgba(94,234,212,.09),rgba(255,255,255,.01));cursor:grab;user-select:none}
+      .industry-agent-header.dragging{cursor:grabbing}
+      .industry-agent-title{color:#f8fafc;font-size:13px;font-weight:800;letter-spacing:.16em;text-transform:uppercase}
+      .industry-agent-subtitle{color:#9bc6c0;font-size:11px;margin-top:4px;line-height:1.5}
+      .industry-agent-toggle{width:34px;height:34px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.03);color:#cbd5e1;display:inline-flex;align-items:center;justify-content:center;border-radius:999px;cursor:pointer}
+      .industry-agent-messages{padding:14px 14px 8px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;min-height:180px;max-height:min(54vh,540px)}
+      .industry-agent-message{display:flex}
+      .industry-agent-message.user{justify-content:flex-end}
+      .industry-agent-bubble{max-width:100%;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.03);color:#e5ecf5;padding:12px 14px;font-size:13px;line-height:1.72;white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere}
+      .industry-agent-message.user .industry-agent-bubble{background:rgba(94,234,212,.1);border-color:rgba(94,234,212,.28)}
+      .industry-agent-working{display:inline-flex;align-items:center;gap:10px;color:#dcfdf7}
+      .industry-agent-working-spinner{width:13px;height:13px;border-radius:999px;border:2px solid rgba(255,255,255,.2);border-top-color:rgba(94,234,212,.95);animation:industry-agent-spin .9s linear infinite}
+      .industry-agent-working-dots{display:inline-flex;gap:4px}
+      .industry-agent-working-dots span{width:4px;height:4px;border-radius:999px;background:rgba(94,234,212,.88);animation:industry-agent-dot-pulse 1.15s ease-in-out infinite}
+      .industry-agent-working-dots span:nth-child(2){animation-delay:.15s}
+      .industry-agent-working-dots span:nth-child(3){animation-delay:.3s}
+      .industry-agent-card{margin-top:12px;border:1px solid rgba(94,234,212,.16);background:rgba(94,234,212,.05);padding:12px}
+      .industry-agent-card-top{display:flex;justify-content:space-between;gap:10px;align-items:start}
+      .industry-agent-card-title{color:#f8fafc;font-size:16px;font-weight:800;line-height:1.25}
+      .industry-agent-card-meta{color:#b6d7d2;font-size:11px;line-height:1.6;margin-top:6px}
+      .industry-agent-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+      .industry-agent-action-btn{border:1px solid rgba(94,234,212,.22);background:rgba(94,234,212,.09);color:#e6fffb;padding:9px 12px;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;cursor:pointer}
+      .industry-agent-input-row{padding:12px 14px 14px;border-top:1px solid rgba(255,255,255,.06);background:rgba(255,255,255,.01)}
+      .industry-agent-input-wrap{display:flex;gap:10px;align-items:end}
+      .industry-agent-input{flex:1 1 auto;min-height:42px;max-height:132px;resize:none;border:1px solid rgba(255,255,255,.08);background:rgba(15,19,27,.92);color:#f8fafc;padding:11px 12px;font-size:13px;line-height:1.5;outline:none;font-family:inherit}
+      .industry-agent-send{border:1px solid rgba(94,234,212,.22);background:rgba(94,234,212,.09);color:#e6fffb;height:42px;padding:0 14px;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;flex:0 0 auto}
+      @keyframes industry-agent-spin{to{transform:rotate(360deg)}}
+      @keyframes industry-agent-dot-pulse{0%,80%,100%{opacity:.28;transform:scale(.8)}40%{opacity:1;transform:scale(1)}}
+      @media (max-width:720px){.industry-agent-chatbox{right:12px;bottom:12px;width:calc(100vw - 24px)}.industry-agent-launcher{right:12px;bottom:12px}}
+    `;
+    document.head.appendChild(styleEl);
+  }
+
+  function summarizeNode(node) {
+    return {
+      id: node.id,
+      name: node.name,
+      tier: node.tier || "",
+      provides: node.provides || "",
+      players: node.players || "",
+      notes: node.notes || ""
+    };
+  }
+
+  function findNodeCandidates(query, limit = 6) {
+    const normalized = normalize(query);
+    if (!normalized) return [];
+    const ranked = [];
+    state.nodesById.forEach((node) => {
+      const blob = [node.name, node.tier, node.provides, node.activities, node.players, node.notes].join(" ").toUpperCase();
+      if (!blob.includes(normalized)) return;
+      let score = 0;
+      if (normalize(node.name) === normalized) score += 120;
+      if (normalize(`N${node.id}`) === normalized || String(node.id) === normalized) score += 110;
+      if (normalize(node.name).startsWith(normalized)) score += 80;
+      if (blob.includes(normalized)) score += 30;
+      ranked.push({ score, node: summarizeNode(node) });
+    });
+    return ranked
+      .sort((a, b) => b.score - a.score || a.node.id - b.node.id)
+      .slice(0, limit)
+      .map((item) => item.node);
+  }
+
+  function extractNodeIdToken(value) {
+    const match = String(value || "").toUpperCase().match(/\bN\s*([0-9]{1,2})\b|\bNODE\s*([0-9]{1,2})\b/);
+    if (!match) return null;
+    const raw = match[1] || match[2] || "";
+    const id = toNumber(raw);
+    return id !== null && state.nodesById.has(id) ? id : null;
+  }
+
+  function findChainMatches(query) {
+    const normalized = normalize(query);
+    if (!normalized) return [];
+    const nodeMatches = [...state.nodesById.values()]
+      .filter((node) => [node.name, node.tier, node.provides, node.activities, node.players, node.notes].join(" ").toUpperCase().includes(normalized))
+      .slice(0, 5)
+      .map((node) => `Node N${node.id} ${node.name} (${node.tier || "-"}) provides ${node.provides || "-"} Major players: ${node.players || "-"}`);
+    const flowMatches = state.flows
+      .filter((flow) => [flow.fromName, flow.toName, flow.whatFlows, flow.whyLink].join(" ").toUpperCase().includes(normalized))
+      .slice(0, 5)
+      .map((flow) => `Flow N${flow.fromId} ${flow.fromName} -> N${flow.toId} ${flow.toName}: ${flow.whatFlows || "-"} Why: ${flow.whyLink || "-"}`);
+    return [...nodeMatches, ...flowMatches];
+  }
+
+  function resolveDashboardTicker(query, preferredCompany) {
+    const directTicker = extractTickerToken(query);
+    if (directTicker) {
+      const byTicker = findCompanyByTicker(directTicker);
+      if (byTicker?.isUsListed) return { ticker: byTicker.ticker, company: byTicker };
+      return { ticker: directTicker, company: byTicker || null };
+    }
+    if (preferredCompany?.isUsListed) return { ticker: preferredCompany.ticker, company: preferredCompany };
+    const firstCompany = findCompanyCandidates(query, 1)[0] || null;
+    if (firstCompany?.isUsListed) return { ticker: firstCompany.ticker, company: firstCompany };
+    const dashTicker = String(window.__equityscanDashboardSnapshot?.info?.symbol || "").trim().toUpperCase();
+    if (dashTicker) return { ticker: dashTicker, company: findCompanyByTicker(dashTicker) };
+    return { ticker: "", company: firstCompany || preferredCompany || null };
+  }
+
+  async function fetchIndustryWebResearch(query, industryKey, selectedNode, selectedCompany) {
+    const ctx = getIndustryContext(industryKey);
+    const response = await fetch(`${API_BASE_URL}/api/websearch`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        query: String(query || "").trim(),
+        context: [
+          ctx.label,
+          ctx.sidebarTitle,
+          ctx.chainContext,
+          ctx.companyContext,
+          ctx.glossaryContext,
+          selectedNode ? `Node ${selectedNode.id} ${selectedNode.name} ${selectedNode.players}` : "",
+          selectedCompany ? `${selectedCompany.company} ${selectedCompany.parent} ${selectedCompany.subsegment}` : ""
+        ].filter(Boolean).join(" "),
+        numResults: 5
+      })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(String(data?.detail || `HTTP ${response.status}`));
+    return Array.isArray(data?.results) ? data.results : [];
+  }
+
+  function formatIndustryNodeCardHtml(node) {
+    return `<div class="industry-agent-card"><div class="industry-agent-card-top"><div><div class="industry-agent-card-title">N${escapeHtml(node.id)} ${escapeHtml(node.name)}</div><div class="industry-agent-card-meta">${escapeHtml(node.tier || "-")}<br>${escapeHtml(node.players || "No representative players listed.")}</div></div></div><div class="industry-agent-actions"><button class="industry-agent-action-btn" type="button" data-agent-focus-node="${escapeHtml(node.id)}">Focus Node</button></div></div>`;
+  }
+
+  function formatIndustryCompanyCardHtml(entry) {
+    return `<div class="industry-agent-card"><div class="industry-agent-card-top"><div><div class="industry-agent-card-title">${escapeHtml(entry.company)}</div><div class="industry-agent-card-meta">${escapeHtml(entry.subsegment || "-")}<br>${escapeHtml(entry.parent || "-")}</div></div>${entry.isUsListed ? `<span class="industry-flow-legend-item" style="border:1px solid rgba(94,234,212,.18);padding:5px 8px">${escapeHtml(entry.ticker)}</span>` : ""}</div><div class="industry-agent-actions">${entry.isUsListed ? `<button class="industry-agent-action-btn" type="button" data-agent-open-dashboard="${escapeHtml(entry.ticker)}">Open ${escapeHtml(entry.ticker)} In Dashboard</button>` : ""}</div></div>`;
+  }
+
+  function pushAgentMessage(role, html) {
+    const plain = String(html || "").replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    state.chatMessages.push({ role, html, text: plain });
+  }
+
+  function pushAgentWorkingMessage() {
+    state.chatMessages.push({
+      role: "assistant",
+      html: '<div class="industry-agent-working"><span class="industry-agent-working-spinner"></span><span>Agent I is tracing the chain</span><span class="industry-agent-working-dots"><span></span><span></span><span></span></span></div>',
+      text: "Agent I is tracing the chain",
+      working: true
+    });
+  }
+
+  function removeAgentWorkingMessage() {
+    const index = state.chatMessages.findIndex((message) => message.working);
+    if (index >= 0) state.chatMessages.splice(index, 1);
+  }
+
+  function renderAgentMessages(host) {
+    host.innerHTML = state.chatMessages.map((message) => `<div class="industry-agent-message ${message.role === "user" ? "user" : "assistant"}"><div class="industry-agent-bubble">${message.html}</div></div>`).join("");
+    host.scrollTop = host.scrollHeight;
+    requestAnimationFrame(() => {
+      if (typeof window.__tmtIndustryClampChatPosition === "function") window.__tmtIndustryClampChatPosition();
+    });
+  }
+
+  function renderAgentWidgetMarkup() {
+    return `<button id="industryAgentLauncher" class="industry-agent-launcher ${state.chatOpen ? "hidden" : ""}" type="button" aria-label="Open Agent I"><i class="fa-solid fa-sitemap"></i></button><aside id="industryAgentChatbox" class="industry-agent-chatbox ${state.chatOpen ? "" : "collapsed"}"><div class="industry-agent-header"><div><div class="industry-agent-title">Agent I</div><div class="industry-agent-subtitle">Industry chain expert, player context, and live web research.</div></div><button id="industryAgentToggle" class="industry-agent-toggle" type="button" aria-label="Minimize Agent I"><i class="fa-solid fa-minus"></i></button></div><div id="industryAgentMessages" class="industry-agent-messages"></div><div class="industry-agent-input-row"><div class="industry-agent-input-wrap"><textarea id="industryAgentInput" class="industry-agent-input" rows="1" placeholder='Ask "where does Nvidia sit in the chain?" or "which node benefits from AI server demand?"'></textarea><button id="industryAgentSend" class="industry-agent-send" type="button">Send</button></div></div></aside>`;
+  }
+
+  async function fetchAgentIResponse(userMessage, industryKey) {
+    const history = state.chatMessages.map((message) => ({ role: message.role, content: String(message.text || "").trim() })).filter((item) => item.content);
+    const selectedNode = getSelectedNode();
+    const lastResolvedNode = getLastResolvedNode();
+    const lastResolvedCompany = getLastResolvedCompany();
+    const ctx = getIndustryContext(industryKey);
+    if (!window.LLMShell?.planIndustryAgentTurn || !window.LLMShell?.answerIndustryAgentTurn) {
+      return { ok: false, error: "Agent I shell is not loaded." };
+    }
+    const planner = await window.LLMShell.planIndustryAgentTurn({
+      agentName: "Agent I",
+      userMessage,
+      industryKey,
+      industryLabel: ctx.label,
+      industryContext: [ctx.chainContext, ctx.companyContext, ctx.glossaryContext].filter(Boolean).join(" "),
+      conversationHistory: history,
+      selectedNode,
+      lastResolvedNode,
+      currentDashboard: window.__equityscanDashboardSnapshot || null
+    });
+    if (!planner.ok) return planner;
+    if (planner.mode === "reply" && !planner.lookupQuery) {
+      return { ok: true, mode: "reply", assistantResponse: planner.assistantResponse };
+    }
+
+    const lookupQuery = String(planner.lookupQuery || selectedNode?.name || lastResolvedNode?.name || "").trim();
+    const explicitNodeId = extractNodeIdToken(lookupQuery) || extractNodeIdToken(userMessage);
+    const explicitNode = explicitNodeId !== null ? summarizeNode(state.nodesById.get(explicitNodeId)) : null;
+    const nodeCandidates = lookupQuery ? findNodeCandidates(lookupQuery, 8) : [];
+    const companyCandidates = lookupQuery ? findCompanyCandidates([lookupQuery, userMessage].join(" "), 8) : [];
+    const selectedCompany = getCompanyById(state.lastResolvedCompanyId) || companyCandidates[0] || lastResolvedCompany || null;
+
+    if (planner.mode === "open_dashboard") {
+      const resolved = resolveDashboardTicker(lookupQuery, selectedCompany);
+      return {
+        ok: true,
+        mode: "open_dashboard",
+        assistantResponse: planner.assistantResponse || (resolved.ticker ? `Opening ${resolved.ticker} in the dashboard.` : "I couldn't find a US-listed ticker to open yet."),
+        openDashboardTicker: resolved.ticker,
+        selectedCompany: resolved.company || selectedCompany || null
+      };
+    }
+
+    const webResults = planner.useWebResearch
+      ? await fetchIndustryWebResearch(planner.searchQuery || [lookupQuery, userMessage].filter(Boolean).join(" "), industryKey, selectedNode, selectedCompany).catch(() => [])
+      : [];
+
+    const answer = await window.LLMShell.answerIndustryAgentTurn({
+      agentName: "Agent I",
+      userMessage,
+      industryKey,
+      industryLabel: ctx.label,
+      industryContext: [ctx.chainContext, ctx.companyContext, ctx.glossaryContext].filter(Boolean).join(" "),
+      lookupQuery,
+      conversationHistory: history,
+      selectedNode,
+      explicitNode,
+      currentDashboard: window.__equityscanDashboardSnapshot || null,
+      candidateNodes: nodeCandidates,
+      candidateCompanies: companyCandidates,
+      chainMatches: findChainMatches([lookupQuery, userMessage].filter(Boolean).join(" ")),
+      webResults
+    });
+    if (!answer.ok) return answer;
+    const chosenNode =
+      (explicitNode?.id ? summarizeNode(state.nodesById.get(explicitNode.id)) : null)
+      || state.nodesById.get(Number(answer.selectedNodeId) || 0)
+      || nodeCandidates[0]
+      || selectedNode
+      || null;
+    const chosenCompany = getCompanyById(answer.selectedCompanyId) || companyCandidates.find((entry) => entry.id === answer.selectedCompanyId) || selectedCompany || null;
+    return {
+      ok: true,
+      mode: "resolve_chain",
+      assistantResponse: answer.assistantResponse,
+      selectedNode: chosenNode,
+      selectedCompany: chosenCompany,
+      openDashboardTicker: answer.openDashboardTicker || "",
+      offerOpenDashboard: Boolean(answer.offerOpenDashboard && answer.openDashboardTicker)
+    };
+  }
+
   function buildRibbonPath(link, nodeBarWidth) {
     const sx = link.source.x + nodeBarWidth;
     const tx = link.target.x;
@@ -406,6 +758,199 @@
     return el;
   }
 
+  function attachIndustryAgentActionHandlers(host, opts) {
+    host.querySelectorAll("[data-agent-open-dashboard]").forEach((el) => {
+      el.addEventListener("click", () => {
+        const ticker = el.getAttribute("data-agent-open-dashboard");
+        if (ticker) opts.onOpenTicker?.(ticker, opts.industryKey || moduleRef.key || "TMT");
+      });
+    });
+    host.querySelectorAll("[data-agent-focus-node]").forEach((el) => {
+      el.addEventListener("click", () => {
+        const nodeId = toNumber(el.getAttribute("data-agent-focus-node"));
+        if (nodeId === null) return;
+        state.selectedNodeId = nodeId;
+        state.lastResolvedNodeId = nodeId;
+        const detailEl = document.getElementById(opts.detailId);
+        if (detailEl) renderNodeDetail(nodeId, detailEl);
+      });
+    });
+  }
+
+  function bindIndustryAgentWidget(host, opts) {
+    const chatboxEl = host.querySelector("#industryAgentChatbox");
+    const launcherEl = host.querySelector("#industryAgentLauncher");
+    const messagesEl = host.querySelector("#industryAgentMessages");
+    const chatInputEl = host.querySelector("#industryAgentInput");
+    const chatSendEl = host.querySelector("#industryAgentSend");
+    const toggleEl = host.querySelector("#industryAgentToggle");
+    const headerEl = chatboxEl?.querySelector(".industry-agent-header");
+    if (!chatboxEl || !launcherEl || !messagesEl || !chatInputEl || !chatSendEl || !toggleEl || !headerEl) return;
+
+    function setChatOpen(open) {
+      state.chatOpen = !!open;
+      clampChatPosition();
+      chatboxEl.classList.toggle("collapsed", !state.chatOpen);
+      launcherEl.classList.toggle("hidden", state.chatOpen);
+      if (!state.chatOpen) headerEl.classList.remove("dragging");
+    }
+
+    function getChatPosition() {
+      const left = Number.parseFloat(chatboxEl.style.left);
+      const top = Number.parseFloat(chatboxEl.style.top);
+      if (Number.isFinite(left) && Number.isFinite(top)) return { left, top };
+      const width = chatboxEl.offsetWidth || 460;
+      const height = chatboxEl.offsetHeight || 580;
+      return {
+        left: Math.max(AGENT_PAD, window.innerWidth - width - AGENT_DEFAULT_RIGHT),
+        top: Math.max(AGENT_PAD, window.innerHeight - height - AGENT_DEFAULT_BOTTOM)
+      };
+    }
+
+    function applyChatPosition(left, top) {
+      chatboxEl.style.left = `${left}px`;
+      chatboxEl.style.top = `${top}px`;
+      chatboxEl.style.right = "auto";
+      chatboxEl.style.bottom = "auto";
+      launcherEl.style.left = `${left + chatboxEl.offsetWidth - launcherEl.offsetWidth}px`;
+      launcherEl.style.top = `${top + chatboxEl.offsetHeight - launcherEl.offsetHeight}px`;
+      launcherEl.style.right = "auto";
+      launcherEl.style.bottom = "auto";
+    }
+
+    function clampChatPosition() {
+      const width = chatboxEl.offsetWidth || 460;
+      const height = chatboxEl.offsetHeight || 580;
+      const position = getChatPosition();
+      const maxLeft = Math.max(AGENT_PAD, window.innerWidth - width - AGENT_PAD);
+      const maxTop = Math.max(AGENT_PAD, window.innerHeight - height - AGENT_PAD);
+      applyChatPosition(
+        Math.max(AGENT_PAD, Math.min(maxLeft, position.left)),
+        Math.max(AGENT_PAD, Math.min(maxTop, position.top))
+      );
+    }
+
+    window.__tmtIndustryClampChatPosition = clampChatPosition;
+
+    function resizeChatInput() {
+      chatInputEl.style.height = "auto";
+      chatInputEl.style.height = `${Math.max(42, Math.min(chatInputEl.scrollHeight, 132))}px`;
+      requestAnimationFrame(clampChatPosition);
+    }
+
+    function initializeChatPosition() {
+      const width = chatboxEl.offsetWidth || 460;
+      const height = chatboxEl.offsetHeight || 580;
+      applyChatPosition(
+        Math.max(AGENT_PAD, window.innerWidth - width - AGENT_DEFAULT_RIGHT),
+        Math.max(AGENT_PAD, window.innerHeight - height - AGENT_DEFAULT_BOTTOM)
+      );
+    }
+
+    function handleDragMove(event) {
+      if (!state.chatDrag.pointerId) return;
+      state.chatDrag.didMove = true;
+      const maxLeft = Math.max(AGENT_PAD, window.innerWidth - chatboxEl.offsetWidth - AGENT_PAD);
+      const maxTop = Math.max(AGENT_PAD, window.innerHeight - chatboxEl.offsetHeight - AGENT_PAD);
+      applyChatPosition(
+        Math.max(AGENT_PAD, Math.min(maxLeft, state.chatDrag.originLeft + (event.clientX - state.chatDrag.startX))),
+        Math.max(AGENT_PAD, Math.min(maxTop, state.chatDrag.originTop + (event.clientY - state.chatDrag.startY)))
+      );
+    }
+
+    function endDrag() {
+      state.chatDrag.pointerId = null;
+      state.chatDrag.didMove = false;
+      headerEl.classList.remove("dragging");
+      document.removeEventListener("mousemove", handleDragMove);
+      document.removeEventListener("mouseup", endDrag);
+    }
+
+    function beginDrag(event) {
+      if (event.target.closest("button")) return;
+      event.preventDefault();
+      clampChatPosition();
+      const position = getChatPosition();
+      state.chatDrag.pointerId = "mouse";
+      state.chatDrag.startX = event.clientX;
+      state.chatDrag.startY = event.clientY;
+      state.chatDrag.originLeft = position.left;
+      state.chatDrag.originTop = position.top;
+      state.chatDrag.didMove = false;
+      headerEl.classList.add("dragging");
+      document.addEventListener("mousemove", handleDragMove);
+      document.addEventListener("mouseup", endDrag);
+    }
+
+    async function handleChatQuery() {
+      const rawMessage = String(chatInputEl.value || "").trim();
+      if (!rawMessage || state.chatBusy) return;
+      pushAgentMessage("user", escapeHtml(rawMessage));
+      renderAgentMessages(messagesEl);
+      chatInputEl.value = "";
+      resizeChatInput();
+      state.chatBusy = true;
+      pushAgentWorkingMessage();
+      renderAgentMessages(messagesEl);
+      try {
+        const response = await fetchAgentIResponse(rawMessage, opts.industryKey || moduleRef.key || "TMT");
+        removeAgentWorkingMessage();
+        if (!response.ok) {
+          pushAgentMessage("assistant", `Agent I hit a wall.<br>${escapeHtml(response.error || "Unknown error.")}`);
+        } else if (response.mode === "open_dashboard") {
+          if (response.selectedCompany?.id) state.lastResolvedCompanyId = response.selectedCompany.id;
+          if (response.openDashboardTicker) {
+            pushAgentMessage("assistant", `${escapeHtml(response.assistantResponse)}<div class="industry-agent-actions"><button class="industry-agent-action-btn" type="button" data-agent-open-dashboard="${escapeHtml(response.openDashboardTicker)}">Open ${escapeHtml(response.openDashboardTicker)} In Dashboard</button></div>`);
+          } else {
+            pushAgentMessage("assistant", escapeHtml(response.assistantResponse));
+          }
+        } else {
+          if (response.selectedNode?.id) {
+            state.selectedNodeId = response.selectedNode.id;
+            state.lastResolvedNodeId = response.selectedNode.id;
+            const detailEl = document.getElementById(opts.detailId);
+            if (detailEl) renderNodeDetail(response.selectedNode.id, detailEl);
+          }
+          if (response.selectedCompany?.id) {
+            state.lastResolvedCompanyId = response.selectedCompany.id;
+          }
+          const nodeHtml = response.selectedNode ? formatIndustryNodeCardHtml(response.selectedNode) : "";
+          const companyHtml = response.selectedCompany ? formatIndustryCompanyCardHtml(response.selectedCompany) : "";
+          const dashHtml = response.offerOpenDashboard && response.openDashboardTicker ? `<div class="industry-agent-actions"><button class="industry-agent-action-btn" type="button" data-agent-open-dashboard="${escapeHtml(response.openDashboardTicker)}">Open ${escapeHtml(response.openDashboardTicker)} In Dashboard</button></div>` : "";
+          pushAgentMessage("assistant", `${escapeHtml(response.assistantResponse)}${nodeHtml}${companyHtml}${dashHtml}`);
+        }
+      } catch (err) {
+        removeAgentWorkingMessage();
+        pushAgentMessage("assistant", `Agent I hit a wall.<br>${escapeHtml(String(err && err.message ? err.message : err))}`);
+      }
+      renderAgentMessages(messagesEl);
+      attachIndustryAgentActionHandlers(host, opts);
+      state.chatBusy = false;
+    }
+
+    headerEl.addEventListener("mousedown", beginDrag);
+    toggleEl.addEventListener("click", () => setChatOpen(false));
+    launcherEl.addEventListener("click", () => setChatOpen(true));
+    window.addEventListener("resize", clampChatPosition);
+    chatSendEl.addEventListener("click", handleChatQuery);
+    chatInputEl.addEventListener("input", resizeChatInput);
+    chatInputEl.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        handleChatQuery();
+      }
+    });
+
+    if (!state.chatMessages.length) {
+      pushAgentMessage("assistant", "I’m Agent I. Ask me about bottlenecks, beneficiaries, where companies sit in the chain, or what current news changes the structure.");
+    }
+    initializeChatPosition();
+    setChatOpen(state.chatOpen);
+    resizeChatInput();
+    renderAgentMessages(messagesEl);
+    attachIndustryAgentActionHandlers(host, opts);
+  }
+
   function buildCenterOutSlots(count) {
     if (count <= 1) return [0];
     const center = Math.floor(count / 2);
@@ -423,6 +968,7 @@
     const source = window.TMTIndustryChainData || window.IndustryChainData;
     const detailEl = document.getElementById(opts.detailId);
     const chartEl = document.getElementById(opts.chartId);
+    const agentHost = opts.agentId ? document.getElementById(opts.agentId) : null;
     if (!source) {
       detailEl.innerHTML = `<div class="industry-detail-text text-red-400">TMT data file is missing.</div>`;
       return;
@@ -436,6 +982,7 @@
     }
 
     ensureChainStyles();
+    ensureAgentStyles();
 
     if (state.resizeObserver) {
       state.resizeObserver.disconnect();
@@ -787,6 +1334,7 @@
         hit.addEventListener("mouseleave", handleLeave);
         hit.addEventListener("click", () => {
           state.selectedNodeId = node.id;
+          state.lastResolvedNodeId = node.id;
           renderNodeDetail(node.id, detailEl);
         });
       });
@@ -826,7 +1374,12 @@
     runRender();
     const defaultNodeId = state.selectedNodeId && state.nodesById.has(state.selectedNodeId) ? state.selectedNodeId : nodes[0].id;
     state.selectedNodeId = defaultNodeId;
+    state.lastResolvedNodeId = defaultNodeId;
     renderNodeDetail(defaultNodeId, detailEl);
+    if (agentHost) {
+      agentHost.innerHTML = renderAgentWidgetMarkup();
+      bindIndustryAgentWidget(agentHost, opts);
+    }
     initialized = true;
   };
 
@@ -841,5 +1394,14 @@
     }
     state.selectedNodeId = null;
     initialized = false;
+  };
+
+  moduleRef.selectIndustryNode = function selectIndustryNode(nodeId) {
+    const numericId = toNumber(nodeId);
+    if (numericId === null || !state.nodesById.has(numericId)) return;
+    state.selectedNodeId = numericId;
+    state.lastResolvedNodeId = numericId;
+    const detailEl = document.getElementById("industryNodeDetail");
+    if (detailEl) renderNodeDetail(numericId, detailEl);
   };
 })();

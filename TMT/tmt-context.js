@@ -11,5 +11,9 @@ window.IndustryModules.TMT = {
     dataVarName: "TMTGlossaryData",
     fileName: "tmt-glossary-data.js",
     llmContext: "Technology, media, telecom, semiconductors, AI infrastructure, cloud, networking, optics, software, and telecom operations."
+  },
+  companies: {
+    dataVarName: "TMTCompanyDirectoryData",
+    fileName: "tmt-company-directory-data.js"
   }
 };

@@ -1,5 +1,6 @@
 (function () {
   const STYLE_ID = "equity-home-module-style";
+  let titleAnimationTimer = null;
 
   const tiles = [
     {
@@ -71,7 +72,7 @@
 
       .es-home-shell {
         min-height: calc(100vh - 60px);
-        padding: 56px 28px 36px;
+        padding: 32px 28px 44px;
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -80,7 +81,8 @@
 
       .es-home-main {
         width: min(100%, 920px);
-        margin-top: 32px;
+        margin-top: 0;
+        transform: translateY(-28px);
       }
 
       .es-home-headline {
@@ -93,6 +95,7 @@
         line-height: 0.96;
         text-transform: uppercase;
         letter-spacing: 0.06em;
+        min-height: 1em;
       }
 
       .es-home-title-equity {
@@ -105,13 +108,89 @@
         color: #8b95a8;
       }
 
-      .es-home-subtitle {
-        margin: 16px auto 0;
-        max-width: 720px;
-        color: #b8c2d6;
-        font-size: clamp(14px, 1.1vw, 18px);
-        line-height: 1.5;
-        letter-spacing: 0.01em;
+      .es-home-title-typing {
+        position: relative;
+        display: inline-block;
+      }
+
+      .es-home-title-ghost,
+      .es-home-title-live {
+        display: inline-flex;
+        align-items: baseline;
+      }
+
+      .es-home-title-ghost {
+        visibility: hidden;
+        pointer-events: none;
+      }
+
+      .es-home-title-live {
+        position: absolute;
+        inset: 0 auto auto 0;
+      }
+
+      .es-home-title-static-e {
+        display: inline-block;
+        font-weight: 800;
+        color: #ffffff;
+        flex: 0 0 auto;
+      }
+
+      .es-home-title-caret {
+        display: inline-block;
+        width: 2px;
+        height: 0.92em;
+        margin-left: 6px;
+        background: rgba(228, 232, 240, 0.92);
+        animation: es-home-caret-blink 0.9s steps(1) infinite;
+        vertical-align: middle;
+        opacity: 1;
+      }
+
+      .es-home-title-caret.hidden {
+        opacity: 0;
+      }
+
+      @keyframes es-home-caret-blink {
+        0%, 48% { opacity: 1; }
+        49%, 100% { opacity: 0; }
+      }
+
+      .es-home-search-row {
+        display: flex;
+        justify-content: center;
+        margin: 22px auto 28px;
+      }
+
+      .es-home-search-box {
+        position: relative;
+        width: min(100%, 520px);
+      }
+
+      .es-home-search-box i {
+        position: absolute;
+        left: 14px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #64748b;
+        font-size: 12px;
+      }
+
+      .es-home-search-input {
+        width: 100%;
+        background: rgba(20, 24, 34, 0.92);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        color: #f8fafc;
+        padding: 13px 16px 13px 40px;
+        font-size: 13px;
+        outline: none;
+        border-radius: 2px;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      }
+
+      .es-home-search-input:focus {
+        border-color: rgba(91, 140, 255, 0.55);
+        box-shadow: 0 0 0 1px rgba(91, 140, 255, 0.22);
       }
 
       .es-home-grid {
@@ -194,7 +273,7 @@
 
       @media (max-width: 1100px) {
         .es-home-shell {
-          padding: 44px 18px 24px;
+          padding: 26px 18px 32px;
         }
 
         .es-home-grid {
@@ -204,7 +283,8 @@
 
       @media (max-width: 720px) {
         .es-home-main {
-          margin-top: 14px;
+          margin-top: 0;
+          transform: translateY(-18px);
         }
 
         .es-home-grid {
@@ -251,6 +331,91 @@
     return `<div class="${className}"${dataAttr}${tabAttr}${idAttr}>${bodyHtml}</div>`;
   }
 
+  function runTitleTypingAnimation(host) {
+    if (!host) return;
+    if (titleAnimationTimer) {
+      window.clearTimeout(titleAnimationTimer);
+      titleAnimationTimer = null;
+    }
+
+    const fixedEquity = "E";
+    const quity = "QUITY";
+    const scan = "SCAN";
+    let quityCount = 0;
+    let scanCount = 0;
+    let phase = "type-initial";
+
+    const renderFrame = () => {
+      const showCaret = phase !== "loop-pause-full";
+
+      host.innerHTML = `
+        <span class="es-home-title-typing">
+          <span class="es-home-title-ghost">
+            <span class="es-home-title-static-e">${fixedEquity}</span><span class="es-home-title-equity">${quity}</span><span class="es-home-title-scan">${scan}</span>
+          </span>
+          <span class="es-home-title-live">
+            <span class="es-home-title-static-e">${fixedEquity}</span><span class="es-home-title-equity">${escapeHtmlText(quity.slice(0, quityCount))}</span><span class="es-home-title-scan">${escapeHtmlText(scan.slice(0, scanCount))}</span><span class="es-home-title-caret${showCaret ? '' : ' hidden'}"></span>
+          </span>
+        </span>
+      `;
+
+      if (phase === "type-initial") {
+        if (quityCount < quity.length) {
+          quityCount += 1;
+          titleAnimationTimer = window.setTimeout(renderFrame, quityCount === 1 ? 170 : 82);
+          return;
+        }
+
+        if (scanCount < scan.length) {
+          scanCount += 1;
+          titleAnimationTimer = window.setTimeout(renderFrame, scanCount === 1 ? 120 : 82);
+          return;
+        }
+
+        phase = "loop-pause-full";
+        titleAnimationTimer = window.setTimeout(renderFrame, 1050);
+        return;
+      }
+
+      if (phase === "loop-pause-full") {
+        phase = "erase-scan";
+        titleAnimationTimer = window.setTimeout(renderFrame, 80);
+        return;
+      }
+
+      if (phase === "erase-scan") {
+        if (scanCount > 0) {
+          scanCount -= 1;
+          titleAnimationTimer = window.setTimeout(renderFrame, 72);
+          return;
+        }
+
+        phase = "loop-pause-empty";
+        titleAnimationTimer = window.setTimeout(renderFrame, 240);
+        return;
+      }
+
+      if (phase === "loop-pause-empty") {
+        phase = "type-scan";
+        titleAnimationTimer = window.setTimeout(renderFrame, 110);
+        return;
+      }
+
+      if (phase === "type-scan") {
+        if (scanCount < scan.length) {
+          scanCount += 1;
+          titleAnimationTimer = window.setTimeout(renderFrame, 82);
+          return;
+        }
+
+        phase = "loop-pause-full";
+        titleAnimationTimer = window.setTimeout(renderFrame, 980);
+      }
+    };
+
+    renderFrame();
+  }
+
   function renderHomeView(opts) {
     ensureStyles();
     const host = document.getElementById(opts?.containerId || "homeViewContent");
@@ -264,8 +429,13 @@
       <div class="es-home-shell">
         <div class="es-home-main">
           <div class="es-home-headline">
-            <div class="es-home-title"><span class="es-home-title-equity">EQUITY</span><span class="es-home-title-scan">SCAN</span></div>
-            <div class="es-home-subtitle">Select an industry to start exploring the industrial chains</div>
+            <div class="es-home-title" id="homeTitleTyping"></div>
+          </div>
+          <div class="es-home-search-row">
+            <div class="es-home-search-box">
+              <i class="fa-solid fa-magnifying-glass"></i>
+              <input id="homeTickerSearch" class="es-home-search-input" type="text" placeholder="Search ticker or company...">
+            </div>
           </div>
           <div class="es-home-grid">${tileHtml}</div>
         </div>
@@ -284,6 +454,20 @@
         }
       });
     });
+
+    const searchInput = host.querySelector("#homeTickerSearch");
+    if (searchInput) {
+      searchInput.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter") return;
+        const value = String(searchInput.value || "").trim();
+        if (!value) return;
+        if (typeof opts?.onSearchTicker === "function") {
+          opts.onSearchTicker(value);
+        }
+      });
+    }
+
+    runTitleTypingAnimation(host.querySelector("#homeTitleTyping"));
   }
 
   window.HomePageModule = { renderHomeView };
