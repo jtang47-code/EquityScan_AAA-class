@@ -9,7 +9,7 @@ window.APP_CONFIG = window.APP_CONFIG || {
   // Do not put private API keys here if this site is hosted publicly on GitHub Pages.
   llmDirectConfig: {
     baseUrl: "https://api.deepseek.com",
-    apiToken: "sk-6245d4a4a89b4bae9db311fd3d83d17c",
+    apiToken: "",
     model: "deepseek-chat",
     apiStyle: "openai-chat",
     apiPath: "/chat/completions",
