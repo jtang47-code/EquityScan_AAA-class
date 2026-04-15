@@ -12,8 +12,9 @@ It is intended for this setup:
 
 - `index.html`: main single-page app shell
 - `Backend.py`: local FastAPI backend
+- `.env`: backend settings you edit directly
 - `app-config.js`: frontend runtime config, including the backend public URL
-- `llm_shell/`: browser-side LLM helpers and workflows
+- `llm_shell/`: frontend workflow layer that sends LLM work through the backend proxy
 - `home/`: home page module
 - `TMT/`: TMT sector data and modules
 
@@ -61,15 +62,27 @@ apiBaseUrl: "https://api.yourdomain.com"
 
 ### `Backend.py`
 
-This backend now supports an environment variable for CORS:
+This backend loads settings from `.env` automatically when it starts.
+
+Edit [`.env`](c:\Users\tangj\Desktop\Trading\Quant Trading\Text analysis&Dashboard\Dashboards\For AA class\.env) directly:
+
+```env
+PORT=8000
+CORS_ALLOW_ORIGINS=https://jtang47-code.github.io
+LLM_PROVIDER_BASE_URL=https://api.deepseek.com
+LLM_PROVIDER_API_TOKEN=YOUR_DEEPSEEK_KEY
+LLM_PROVIDER_MODEL=deepseek-chat
+```
+
+Do not publish `.env` to the public frontend repo. This folder now includes [`.gitignore`](c:\Users\tangj\Desktop\Trading\Quant Trading\Text analysis&Dashboard\Dashboards\For AA class\.gitignore) to keep it local.
+
+Important fields:
 
 `CORS_ALLOW_ORIGINS`
+- must stay `https://jtang47-code.github.io` for your GitHub Pages frontend
 
-For this GitHub Pages deployment, use:
-
-```powershell
-$env:CORS_ALLOW_ORIGINS="https://jtang47-code.github.io"
-```
+`LLM_PROVIDER_API_TOKEN`
+- put your provider key here
 
 Then start the backend:
 
@@ -119,7 +132,6 @@ If you do not already own a domain, you must purchase one first to get a permane
 
 ```powershell
 cd "c:\Users\tangj\Desktop\Trading\Quant Trading\Text analysis&Dashboard\Dashboards\For AA class"
-$env:CORS_ALLOW_ORIGINS="https://jtang47-code.github.io"
 python .\Backend.py
 ```
 
@@ -134,6 +146,19 @@ cloudflared tunnel --url http://localhost:8000
 4. Paste it into `app-config.js` as `apiBaseUrl`.
 
 5. Publish the frontend files to GitHub Pages.
+
+## LLM Routing
+
+This version routes LLM requests through the backend.
+
+That means:
+
+- the frontend does not need a provider API key
+- the frontend only needs `apiBaseUrl`
+- the backend calls the provider and keeps the API key private
+
+If agent chat fails with an LLM configuration error, check the backend environment variables first.
+If you are using this folder as intended, that means checking `.env` first.
 
 
 ## Summary

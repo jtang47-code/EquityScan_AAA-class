@@ -21,11 +21,33 @@ except Exception:
     google_search = None
 
 
+def load_env_file(env_path):
+    path = Path(env_path)
+    if not path.exists():
+        return
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        if not key:
+            continue
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
+            value = value[1:-1]
+        os.environ.setdefault(key, value)
+
+
+load_env_file(Path(__file__).resolve().parent / ".env")
+
+
 PORT = int(os.environ.get("PORT", "8000"))
 BASE_DIR = Path(__file__).resolve().parent
 STOCK_CACHE_TTL_SECONDS = 900
 BENCHMARK_CACHE_TTL_SECONDS = 3600
 WEBSEARCH_CACHE_TTL_SECONDS = 21600
+LLM_TIMEOUT_SECONDS = int(os.environ.get("LLM_TIMEOUT_SECONDS", "90"))
 STOCK_PAYLOAD_CACHE = {}
 BENCHMARK_HISTORY_CACHE = {"timestamp": 0.0, "data": []}
 WEBSEARCH_CACHE = {}
@@ -72,8 +94,165 @@ class GlossarySaveRequest(BaseModel):
     entries: list[GlossaryEntryPayload] | None = None
 
 
+class LlmProxyRequest(BaseModel):
+    systemPrompt: str
+    userPrompt: str
+    overrideConfig: dict | None = None
+
+
 def now_ts():
     return time.time()
+
+
+def get_llm_provider_config(override_config=None):
+    override = override_config if isinstance(override_config, dict) else {}
+    return {
+        "baseUrl": str(os.environ.get("LLM_PROVIDER_BASE_URL", "https://api.deepseek.com")).strip(),
+        "apiToken": str(os.environ.get("LLM_PROVIDER_API_TOKEN", "")).strip(),
+        "model": str(override.get("model") or os.environ.get("LLM_PROVIDER_MODEL", "deepseek-chat")).strip(),
+        "apiStyle": str(override.get("apiStyle") or os.environ.get("LLM_PROVIDER_API_STYLE", "openai-chat")).strip(),
+        "apiPath": str(override.get("apiPath") or os.environ.get("LLM_PROVIDER_API_PATH", "/chat/completions")).strip(),
+        "maxTokens": int(override.get("maxTokens") or os.environ.get("LLM_PROVIDER_MAX_TOKENS", "600")),
+        "temperature": float(override.get("temperature") if override.get("temperature") is not None else os.environ.get("LLM_PROVIDER_TEMPERATURE", "0.2")),
+        "anthropicVersion": str(override.get("anthropicVersion") or os.environ.get("LLM_PROVIDER_ANTHROPIC_VERSION", "2023-06-01")).strip(),
+    }
+
+
+def extract_llm_reply_text(data):
+    if not data or not isinstance(data, dict):
+        return ""
+    if isinstance(data.get("content"), list):
+        text = "\n".join(
+            str(item.get("text") or "").strip()
+            for item in data["content"]
+            if isinstance(item, dict) and item.get("type") == "text"
+        ).strip()
+        if text:
+            return text
+    choices = data.get("choices")
+    if isinstance(choices, list) and choices and isinstance(choices[0], dict):
+        message = choices[0].get("message") or {}
+        if isinstance(message, dict) and str(message.get("content") or "").strip():
+            return str(message.get("content")).strip()
+    if str(data.get("output_text") or "").strip():
+        return str(data.get("output_text")).strip()
+    error = data.get("error") or {}
+    if isinstance(error, dict) and str(error.get("message") or "").strip():
+        return str(error.get("message")).strip()
+    return ""
+
+
+def build_llm_url(base, path):
+    trimmed_base = str(base or "").rstrip("/")
+    normalized_path = str(path or "")
+    if not normalized_path.startswith("/"):
+        normalized_path = f"/{normalized_path}"
+    if re.search(r"/v\d+$", trimmed_base) and normalized_path.startswith("/v"):
+        normalized_path = re.sub(r"^/v\d+", "", normalized_path)
+    return f"{trimmed_base}{normalized_path}"
+
+
+def build_llm_attempt(style, base, path, cfg, system_prompt, user_prompt):
+    if style == "anthropic-messages":
+        return {
+            "url": build_llm_url(base, path or "/v1/messages"),
+            "headers": {
+                "Content-Type": "application/json",
+                "x-api-key": cfg["apiToken"],
+                "anthropic-version": cfg["anthropicVersion"],
+            },
+            "body": {
+                "model": cfg["model"],
+                "max_tokens": cfg["maxTokens"],
+                "system": system_prompt,
+                "messages": [{"role": "user", "content": user_prompt}],
+            },
+        }
+
+    if style == "openai-responses":
+        return {
+            "url": build_llm_url(base, path or "/v1/responses"),
+            "headers": {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {cfg['apiToken']}",
+            },
+            "body": {
+                "model": cfg["model"],
+                "temperature": cfg["temperature"],
+                "input": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+            },
+        }
+
+    return {
+        "url": build_llm_url(base, path or "/v1/chat/completions"),
+        "headers": {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {cfg['apiToken']}",
+        },
+        "body": {
+            "model": cfg["model"],
+            "temperature": cfg["temperature"],
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+        },
+    }
+
+
+def execute_llm_attempt(attempt):
+    response = requests.post(
+        attempt["url"],
+        headers=attempt["headers"],
+        json=attempt["body"],
+        timeout=LLM_TIMEOUT_SECONDS,
+    )
+    raw = response.text
+    if "<html" in raw.lower():
+        return {
+            "ok": False,
+            "error": f"Gateway returned HTML instead of API JSON at {attempt['url']}",
+        }
+    try:
+        data = response.json()
+    except Exception:
+        data = {"error": {"message": raw}}
+    reply = extract_llm_reply_text(data)
+    if response.ok and reply:
+        return {"ok": True, "reply": reply}
+    return {"ok": False, "error": f"{reply or f'HTTP {response.status_code}'} at {attempt['url']}"}
+
+
+def request_llm_text(system_prompt, user_prompt, override_config=None):
+    cfg = get_llm_provider_config(override_config)
+    if not cfg["baseUrl"] or not cfg["apiToken"] or not cfg["model"]:
+        raise RuntimeError(
+            "Backend LLM configuration is incomplete. Set LLM_PROVIDER_BASE_URL, LLM_PROVIDER_API_TOKEN, and LLM_PROVIDER_MODEL."
+        )
+
+    base = str(cfg["baseUrl"]).rstrip("/")
+    attempts = []
+    if cfg["apiStyle"] or cfg["apiPath"]:
+        attempts.append(build_llm_attempt(cfg["apiStyle"] or "openai-chat", base, cfg["apiPath"], cfg, system_prompt, user_prompt))
+    attempts.append(build_llm_attempt("openai-chat", base, "/v1/chat/completions", cfg, system_prompt, user_prompt))
+    attempts.append(build_llm_attempt("openai-chat", base, "/chat/completions", cfg, system_prompt, user_prompt))
+    attempts.append(build_llm_attempt("openai-responses", base, "/v1/responses", cfg, system_prompt, user_prompt))
+    attempts.append(build_llm_attempt("anthropic-messages", base, "/v1/messages", cfg, system_prompt, user_prompt))
+
+    errors = []
+    for attempt in attempts:
+        try:
+            result = execute_llm_attempt(attempt)
+            if result["ok"]:
+                return result["reply"]
+            errors.append(result["error"])
+        except Exception as exc:
+            errors.append(f"{str(exc)} at {attempt['url']}")
+
+    raise RuntimeError(" | ".join(errors) or "LLM request failed.")
 
 
 def is_rate_limited_error(err):
@@ -532,6 +711,19 @@ def websearch(payload: WebSearchRequest):
         raise HTTPException(status_code=400, detail=str(exc))
 
 
+@app.post("/api/llm")
+def llm_proxy(payload: LlmProxyRequest):
+    try:
+        reply = request_llm_text(
+            system_prompt=str(payload.systemPrompt or ""),
+            user_prompt=str(payload.userPrompt or ""),
+            override_config=payload.overrideConfig or {},
+        )
+        return {"reply": reply}
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
 @app.post("/api/glossary/save")
 def glossary_save(payload: GlossarySaveRequest):
     try:
@@ -584,6 +776,9 @@ def glossary_save(payload: GlossarySaveRequest):
 if __name__ == "__main__":
     import uvicorn
 
+    llm_cfg = get_llm_provider_config()
     print(f"Server running on http://0.0.0.0:{PORT}")
     print(f"CORS origins: {', '.join(get_cors_origins())}")
+    print(f"LLM provider base URL: {llm_cfg['baseUrl']}")
+    print(f"LLM provider model: {llm_cfg['model']}")
     uvicorn.run("Backend:app", host="0.0.0.0", port=PORT, reload=False)
