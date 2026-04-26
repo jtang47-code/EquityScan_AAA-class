@@ -711,6 +711,8 @@
 </head>
 <body>
 
+    <div id="presentationDeckHost"></div>
+
     <div class="app-shell" id="appShell">
     <div class="top-frame">
         <div class="brand-bar">
@@ -1106,6 +1108,9 @@
                     onSelectIndustry: selectIndustry,
                     onSearchTicker: openDashboardForTicker
                 });
+                if(typeof window.HomePageModule.renderPresentationDeckOverlay === 'function') {
+                    window.HomePageModule.renderPresentationDeckOverlay({ containerId: 'presentationDeckHost' });
+                }
                 return;
             }
             const homeHost = document.getElementById('homeViewContent');
@@ -1200,6 +1205,9 @@
             
             document.getElementById(`${tabId}View`).classList.remove('hidden');
             setRibbonState(tabId);
+            if(window.HomePageModule && typeof window.HomePageModule.renderPresentationDeckOverlay === 'function') {
+                window.HomePageModule.renderPresentationDeckOverlay({ containerId: 'presentationDeckHost' });
+            }
             if(tabId === 'home') initHomeView();
             if(tabId === 'dashboard') {
                 const agentIndustryKey = activeIndustryKey || 'TMT';
