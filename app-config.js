@@ -1,3 +1,9 @@
+window.APP_CONFIG = window.APP_CONFIG || {
+  // Paste the current Cloudflare backend URL here when it changes.
+  // Example: "https://abc-def-ghi.trycloudflare.com"
+  apiBaseUrl: ""
+};
+
 (function () {
   const STORAGE_KEY = "equityscan.apiBaseUrl";
   const config = window.APP_CONFIG = window.APP_CONFIG || {};
