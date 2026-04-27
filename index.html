@@ -1006,7 +1006,9 @@
     </div>
     </div>
 
-    <script src="app-config.js?v=20260415b"></script>
+    <script>
+        document.write('<script src="app-config.js?ts=' + Date.now() + '"><\/script>');
+    </script>
     <script src="llm_shell/client.js?v=20260415b"></script>
     <script src="llm_shell/workflows.js?v=20260415b"></script>
     <script src="TMT/tmt-context.js?v=20260415b"></script>
