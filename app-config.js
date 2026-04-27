@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 (function () {
   const STORAGE_KEY = "equityscan.apiBaseUrl";
   const config = window.APP_CONFIG = window.APP_CONFIG || {};
@@ -47,3 +48,10 @@
   else if (storedBaseUrl) config.apiBaseUrl = storedBaseUrl;
   else config.apiBaseUrl = fileBaseUrl;
 })();
+=======
+window.APP_CONFIG = window.APP_CONFIG || {
+  // Public backend URL exposed through Cloudflare Tunnel. Update everytime restart Cloudflare
+  // Example: "https://api.yourdomain.com"
+  apiBaseUrl: "https://dui-glen-oral-racks.trycloudflare.com"
+};
+>>>>>>> 6e0a34ad09ef89ab5ccc5ec03fb2f7108e6aa192
