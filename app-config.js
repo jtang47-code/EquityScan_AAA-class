@@ -1,5 +1,5 @@
 window.APP_CONFIG = window.APP_CONFIG || {
   // Public backend URL exposed through Cloudflare Tunnel. Update everytime restart Cloudflare
   // Example: "https://api.yourdomain.com"
-  apiBaseUrl: "https://thats-telecom-baby-envelope.trycloudflare.com"
+  apiBaseUrl: "https://languages-mine-twenty-automotive.trycloudflare.com "
 };
