@@ -1,6 +1,6 @@
 (function () {
   const STORAGE_KEY = "equityscan.apiBaseUrl";
-  const config = window.APP_CONFIG = window.APP_CONFIG || {};
+  const config = window.APP_CONFIG = window.APP_CONFIG || {https://dui-glen-oral-racks.trycloudflare.com};
   const normalizeBaseUrl = (value) => String(value || "").trim().replace(/\/+$/, "");
 
   function readStoredBaseUrl() {
