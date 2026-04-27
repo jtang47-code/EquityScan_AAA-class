@@ -2,6 +2,7 @@ import os
 import time
 import json
 import re
+import math
 from datetime import datetime
 from pathlib import Path
 
@@ -102,6 +103,20 @@ class LlmProxyRequest(BaseModel):
 
 def now_ts():
     return time.time()
+
+
+def sanitize_json_value(value):
+    if isinstance(value, dict):
+        return {key: sanitize_json_value(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [sanitize_json_value(item) for item in value]
+    if isinstance(value, tuple):
+        return [sanitize_json_value(item) for item in value]
+    if isinstance(value, float):
+        if math.isnan(value) or math.isinf(value):
+            return None
+        return value
+    return value
 
 
 def get_llm_provider_config(override_config=None):
@@ -654,6 +669,7 @@ def fetch_stock_payload(ticker_symbol):
             "annual": get_financials(stock, is_quarterly=False),
         },
     }
+    payload = sanitize_json_value(payload)
     set_cached_stock_payload(ticker_symbol, payload)
     return payload
 

@@ -6,7 +6,11 @@
   const STYLE_ID = "tmt-master-style";
   const STORAGE_KEY = "equityscan.master.tmt.sessions";
   const REPORT_STORAGE_KEY = "equityscan.master.tmt.reports";
-  const API_BASE_URL = window.APP_CONFIG?.apiBaseUrl || (window.location.protocol === "file:" ? "http://localhost:8000" : "");
+  function getApiBaseUrl() {
+    const appBase = String(window.APP_CONFIG?.getApiBaseUrl?.() || window.APP_CONFIG?.apiBaseUrl || "").trim();
+    if (appBase) return appBase.replace(/\/+$/, "");
+    return window.location.protocol === "file:" ? "http://localhost:8000" : "";
+  }
   const state = { activeChatId: "", historyOpen: false, mode: "chat" };
 
   function escapeHtml(value) {
@@ -353,7 +357,7 @@
   }
 
   async function fetchWebResearch(query, context, numResults = 5) {
-    const response = await fetch(`${API_BASE_URL}/api/websearch`, {
+    const response = await fetch(`${getApiBaseUrl()}/api/websearch`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ query: String(query || "").trim(), context: String(context || "").trim(), numResults })
@@ -368,7 +372,7 @@
     if (!cleanTicker) return null;
     const current = window.__equityscanDashboardSnapshot;
     if (current?.info && normalize(current.info.symbol) === cleanTicker) return current;
-    const response = await fetch(`${API_BASE_URL}/api/stock?ticker=${encodeURIComponent(cleanTicker)}`);
+    const response = await fetch(`${getApiBaseUrl()}/api/stock?ticker=${encodeURIComponent(cleanTicker)}`);
     const data = await response.json().catch(() => null);
     if (!response.ok || !data) return null;
     return data;
@@ -377,7 +381,7 @@
   async function saveGlossaryEntry(industryKey, entry) {
     const cfg = window.IndustryModules?.[industryKey]?.glossary || { fileName: `${String(industryKey || "industry").toLowerCase()}-glossary-data.js`, dataVarName: `${industryKey}GlossaryData` };
     const currentEntries = getGlossaryEntries(industryKey);
-    const response = await fetch(`${API_BASE_URL}/api/glossary/save`, {
+    const response = await fetch(`${getApiBaseUrl()}/api/glossary/save`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ industryKey, fileName: cfg.fileName, dataVarName: cfg.dataVarName, entry })

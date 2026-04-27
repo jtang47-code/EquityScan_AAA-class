@@ -1019,9 +1019,11 @@
     <script src="TMT/tmt-master.js?v=20260415b"></script>
     <script src="home/home-view.js?v=20260415b"></script>
     <script>
-        const API_BASE_URL = window.APP_CONFIG?.apiBaseUrl
-            || (window.location.protocol === 'file:' ? 'http://localhost:8000' : '');
-        const API_URL = `${API_BASE_URL}/api/stock`;
+        function getBackendBaseUrl() {
+            const appBase = String(window.APP_CONFIG?.getApiBaseUrl?.() || window.APP_CONFIG?.apiBaseUrl || '').trim();
+            if (appBase) return appBase.replace(/\/+$/, '');
+            return window.location.protocol === 'file:' ? 'http://localhost:8000' : '';
+        }
         let chartMap = {};
         let globalRawPriceData = [];
         let globalRawBenchData = [];
@@ -1315,7 +1317,7 @@
 
             try {
                 let data;
-                const res = await fetch(`${API_URL}?ticker=${ticker}`);
+                const res = await fetch(`${getBackendBaseUrl()}/api/stock?ticker=${ticker}`);
                 if(!res.ok) {
                     let detail = "Backend error";
                     try {

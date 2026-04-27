@@ -45,7 +45,7 @@
   }
 
   function getBackendBaseUrl() {
-    const appBase = String(window.APP_CONFIG?.apiBaseUrl || "").trim();
+    const appBase = String(window.APP_CONFIG?.getApiBaseUrl?.() || window.APP_CONFIG?.apiBaseUrl || "").trim();
     if (appBase) return appBase.replace(/\/+$/, "");
     if (window.location.protocol === "file:") return "http://localhost:8000";
     return "";

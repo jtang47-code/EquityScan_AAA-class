@@ -25,8 +25,11 @@
       skipLauncherClick: false
     }
   };
-  const API_BASE_URL = window.APP_CONFIG?.apiBaseUrl
-    || (window.location.protocol === "file:" ? "http://localhost:8000" : "");
+  function getApiBaseUrl() {
+    const appBase = String(window.APP_CONFIG?.getApiBaseUrl?.() || window.APP_CONFIG?.apiBaseUrl || "").trim();
+    if (appBase) return appBase.replace(/\/+$/, "");
+    return window.location.protocol === "file:" ? "http://localhost:8000" : "";
+  }
   const CHAT_VIEWPORT_PADDING = 8;
   const CHAT_DEFAULT_RIGHT = 28;
   const CHAT_DEFAULT_BOTTOM = 24;
@@ -355,7 +358,7 @@
   }
 
   async function fetchGlossaryWebResearch(query, industryKey) {
-    const response = await fetch(`${API_BASE_URL}/api/websearch`, {
+    const response = await fetch(`${getApiBaseUrl()}/api/websearch`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -487,7 +490,7 @@
     });
     if (exists) return { saved: false, reason: "Entry already exists in the glossary database." };
 
-    const response = await fetch(`${API_BASE_URL}/api/glossary/save`, {
+    const response = await fetch(`${getApiBaseUrl()}/api/glossary/save`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

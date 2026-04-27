@@ -122,6 +122,8 @@ window.TMTGlossaryData = [
   { acronym: "RLHF", meaning: "Reinforcement Learning from Human Feedback", practicalExplanation: "A model tuning method using human preference signals." },
   { acronym: "ROADM", meaning: "Reconfigurable Optical Add Drop Multiplexer", practicalExplanation: "An optical transport component used in telecom and long haul networks." },
   { acronym: "ROAS", meaning: "Return on Ad Spend", practicalExplanation: "Revenue generated relative to advertising spend." },
+  { acronym: "Rubin", meaning: "NVIDIA's next-generation GPU architecture succeeding Blackwell, named after astronomer Vera Rubin.", practicalExplanation: "In the TMT sector, Rubin refers to NVIDIA's next-generation GPU architecture, expected to succeed the Blackwell architecture. It is named after astronomer Vera Rubin and is anticipated to feature significant performance improvements for AI and HPC workloads." },
+  { acronym: "Rubin", meaning: "NVIDIA's next-generation GPU architecture succeeding Blackwell.", practicalExplanation: "In the TMT sector, Rubin refers to NVIDIA's next-generation GPU architecture, expected to succeed the Blackwell architecture. It is named after astronomer Vera Rubin and is anticipated to feature significant performance improvements for AI and HPC workloads." },
   { acronym: "SaaS", meaning: "Software as a Service", practicalExplanation: "Software delivered over the internet on a subscription basis." },
   { acronym: "SAM", meaning: "Serviceable Addressable Market", practicalExplanation: "The portion of TAM that a company can realistically serve with its current product or business scope." },
   { acronym: "SDK", meaning: "Software Development Kit", practicalExplanation: "A set of tools for developers building on a platform." },

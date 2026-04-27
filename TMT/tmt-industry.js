@@ -4,7 +4,11 @@
   window.IndustryModules.TMT = moduleRef;
 
   let initialized = false;
-  const API_BASE_URL = window.APP_CONFIG?.apiBaseUrl || (window.location.protocol === "file:" ? "http://localhost:8000" : "");
+  function getApiBaseUrl() {
+    const appBase = String(window.APP_CONFIG?.getApiBaseUrl?.() || window.APP_CONFIG?.apiBaseUrl || "").trim();
+    if (appBase) return appBase.replace(/\/+$/, "");
+    return window.location.protocol === "file:" ? "http://localhost:8000" : "";
+  }
   const AGENT_PAD = 8;
   const AGENT_DEFAULT_RIGHT = 28;
   const AGENT_DEFAULT_BOTTOM = 24;
@@ -438,7 +442,7 @@
 
   async function fetchIndustryWebResearch(query, industryKey, selectedNode, selectedCompany) {
     const ctx = getIndustryContext(industryKey);
-    const response = await fetch(`${API_BASE_URL}/api/websearch`, {
+    const response = await fetch(`${getApiBaseUrl()}/api/websearch`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

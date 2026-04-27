@@ -5,7 +5,11 @@
 
   const STYLE_ID = "tmt-company-directory-style";
   const WATCHLIST_KEY = "equityscan.watchlist.tmt";
-  const API_BASE_URL = window.APP_CONFIG?.apiBaseUrl || (window.location.protocol === "file:" ? "http://localhost:8000" : "");
+  function getApiBaseUrl() {
+    const appBase = String(window.APP_CONFIG?.getApiBaseUrl?.() || window.APP_CONFIG?.apiBaseUrl || "").trim();
+    if (appBase) return appBase.replace(/\/+$/, "");
+    return window.location.protocol === "file:" ? "http://localhost:8000" : "";
+  }
   const PAD = 8;
   const DEFAULT_RIGHT = 28;
   const DEFAULT_BOTTOM = 24;
@@ -222,7 +226,7 @@
 
   async function fetchCompanyWebResearch(query, industryKey, selectedCompany) {
     const ctx = getIndustryContext(industryKey);
-    const response = await fetch(`${API_BASE_URL}/api/websearch`, {
+    const response = await fetch(`${getApiBaseUrl()}/api/websearch`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
