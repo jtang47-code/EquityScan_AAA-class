@@ -1,7 +1,7 @@
 window.APP_CONFIG = window.APP_CONFIG || {
   // Paste the current Cloudflare backend URL here when it changes.
   // Example: "https://abc-def-ghi.trycloudflare.com"
-  apiBaseUrl: ""
+  apiBaseUrl: "https://dui-glen-oral-racks.trycloudflare.com"
 };
 
 (function () {
